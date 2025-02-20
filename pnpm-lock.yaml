@@ -15,8 +15,8 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@openzeppelin/contracts@5.1.0)
       fhevm:
-        specifier: ^0.6.1
-        version: 0.6.1
+        specifier: ^0.6.2
+        version: 0.6.2
     devDependencies:
       '@commitlint/cli':
         specifier: ^19.6.0
@@ -1927,8 +1927,8 @@ packages:
   fhevm-core-contracts@0.6.1:
     resolution: {integrity: sha512-lZsnuEgLsGME5LPPhwAHyXUuURqP6Lp2orA7pH32ybSGo8ZJe9cmyL84uQk3bUGn2mGG+8rU8KZ8FGR5sWfhdA==}
 
-  fhevm@0.6.1:
-    resolution: {integrity: sha512-L/tmIuqusjhZwCgDqTRWicOtasmE2G2sdFObNYn6ZBrBjL0SnvneSeUSGN/ExL1dAwt16Nyw2Tbom2uVQwJwcA==}
+  fhevm@0.6.2:
+    resolution: {integrity: sha512-P8E4bA6QWPydCBVp3gWRaPYGDYc5Ablqalt8ag3TikVOnqZVyGU0vdhnjrTDWvumnhs7thY5t9lWsH162nlYyQ==}
     engines: {node: '>=20.0.0'}
 
   fhevmjs@0.6.1:
@@ -6098,7 +6098,7 @@ snapshots:
 
   fhevm-core-contracts@0.6.1: {}
 
-  fhevm@0.6.1:
+  fhevm@0.6.2:
     dependencies:
       '@openzeppelin/contracts': 5.1.0
       extra-bigint: 1.2.0
