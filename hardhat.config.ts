@@ -29,7 +29,7 @@ const dotenvConfigPath: string = process.env.DOTENV_CONFIG_PATH || "./.env";
 dotenv.config({ path: resolve(__dirname, dotenvConfigPath) });
 
 // Ensure that we have all the environment variables we need.
-const mnemonic: string = process.env.MNEMONIC!;
+const mnemonic: string = process.env.MNEMONIC || "test test test test test test test test test test test junk";
 
 const chainIds = {
   zama: 8009,
@@ -40,18 +40,19 @@ const chainIds = {
 
 function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
   let jsonRpcUrl: string;
+  let accounts = {}
   switch (chain) {
     case "local":
-      jsonRpcUrl = "http://localhost:8545";
+      jsonRpcUrl = "http://127.0.0.1:8545";
       break;
     case "localCoprocessor":
-      jsonRpcUrl = "http://localhost:8745";
+      jsonRpcUrl = "http://127.0.0.1:8745";
       break;
     case "zama":
       jsonRpcUrl = "https://devnet.zama.ai";
       break;
     case "sepolia":
-      jsonRpcUrl = process.env.SEPOLIA_RPC_URL!;
+      jsonRpcUrl = process.env.SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/YOUR-PROJECT-ID";
   }
   return {
     accounts: {
@@ -85,7 +86,7 @@ const config: HardhatUserConfig = {
     pages: "files",
     exclude: ["test/"],
   },
-  defaultNetwork: "local",
+  defaultNetwork: "hardhat",
   namedAccounts: {
     deployer: 0,
   },
@@ -106,11 +107,11 @@ const config: HardhatUserConfig = {
         path: "m/44'/60'/0'/0",
       },
     },
-    sepolia: getChainConfig("sepolia"),
-    zama: getChainConfig("zama"),
-    localDev: getChainConfig("local"),
-    local: getChainConfig("local"),
-    localCoprocessor: getChainConfig("localCoprocessor"),
+    // sepolia: getChainConfig("sepolia"),
+    // zama: getChainConfig("zama"),
+    // localDev: getChainConfig("local"),
+    // local: getChainConfig("local"),
+    // localCoprocessor: getChainConfig("localCoprocessor"),
   },
   paths: {
     artifacts: "./artifacts",
