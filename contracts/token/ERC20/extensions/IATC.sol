@@ -1,12 +1,10 @@
 pragma solidity ^0.8.24;
 
-import "fhevm/lib/TFHE.sol";
-
 /**
- * @title   IConfidentialATC.
- * @notice  Interface that defines ATC-like tokens with encrypted balances.
+ * @title   IATC.
+ * @notice  Interface that defines ATC
  */
-interface IConfidentialATC {
+interface IATC {
 
 	/**
  	 * @notice          Return the number of decimals.
@@ -27,13 +25,85 @@ interface IConfidentialATC {
 	function symbol() external view returns (string memory symbol);
 
 	/*
-	 * @notice Get the available balance of the specified account (net balance minus earmarked/held tokens).
+	 * Get the available balance of the specified account (net balance minus earmarked/held tokens).
 	 * @param account The account id.
 	 * @return Returns the available balance of the account.
 	 */
 	function getAvailableBalanceOf(
 		string calldata account
-	) external view returns (euint64);
+	) external view returns (uint256);
+
+	/*
+   * @notice Create tokens into the specified account.
+   * @param operationId The id of the operation.
+	 * @param toAccount The account id.
+	 * @param amount The number of tokens.
+	 * @param metaData Any public meta data / instructions accompanying the operation.
+	 * @return A boolean indicating successful execution of the function.`
+	 */
+	function create(
+		string calldata operationId,
+		string calldata toAccount,
+		uint256 amount,
+		string calldata metaData
+	) external returns (bool);
+
+	/* @notice Event emitted after tokens were created. */
+	event CreateExecuted(
+		string operationId,
+		string toAccount,
+		uint256 amount,
+		string metaData
+	);
+
+	/*
+	 * @notice Destroy tokens from the specified account.
+	 * @param operationId The id of the operation.
+	 * @param fromAccount The account id.
+	 * @param amount The number of tokens.
+	 * @param metaData Any public meta data / instructions accompanying the operation.
+	 * @return A boolean indicating successful execution of the function.
+	 */
+	function destroy(
+		string calldata operationId,
+		string calldata fromAccount,
+		uint256 amount,
+		string calldata metaData
+	) external returns (bool);
+
+	/* Event emitted after tokens were destroyed. */
+	event DestroyExecuted(
+		string operationId,
+		string fromAccount,
+		uint256 amount,
+		string metaData
+	);
+
+	/*
+	 * @notice Transfer tokens from one account to another.
+	 * @param operationId The id of the operation.
+	 * @param fromAccount The account id to transfer from.
+	 * @param toAccount The account id to transfer to.
+	 * @param amount The number of tokens.
+	 * @param metaData Any public meta data / instructions accompanying the operation.
+	 * @return Returns a boolean indicating successful execution of the function.
+	 */
+	function transfer(
+		string calldata operationId,
+		string calldata fromAccount,
+		string calldata toAccount,
+		uint256 amount,
+		string calldata metaData
+	) external returns (bool);
+
+	/* Event emitted after tokens were destroyed. */
+	event TransferExecuted(
+		string operationId,
+		string fromAccount,
+		string toAccount,
+		uint256 amount,
+		string metaData
+	);
 
 	/*
 	 * @notice Create a hold on some tokens, earmarked to be transferred from one account to another. Tokens on
@@ -44,7 +114,7 @@ interface IConfidentialATC {
 	 * @param fromAccount The account to hold from.
 	 * @param toAccount The account to hold to.
 	 * @param notaryId The notary id.
-	 * @param amount The encrypted amount of tokens.
+	 * @param amount The amount of tokens.
 	 * @param duration The timeout period (seconds).
 	 * @param metaData Any public meta data / instructions accompanying the operation.
 	 * @return Returns true upon success.
@@ -55,18 +125,18 @@ interface IConfidentialATC {
 		string calldata fromAccount,
 		string calldata toAccount,
 		string calldata notaryId,
-		euint64 amount,
+		uint256 amount,
 		uint256 duration,
 		string calldata metaData
 	) external returns (bool);
 
-	/* Event emitted after a hold was successfully created. */
+	/* @notice Event emitted after a hold was successfully created. */
 	event CreateHoldExecuted(
 		string operationId,
 		string fromAccount,
 		string toAccount,
 		string notaryId,
-		euint64 amount,
+		uint256 amount,
 		string metaData
 	);
 
@@ -96,7 +166,7 @@ interface IConfidentialATC {
 		string calldata operationId
 	) external returns (bool);
 
-	/* @notice Event emitted after a hold was executed. */
+	/* Event emitted after a hold was executed. */
 	event ExecuteHoldExecuted(
 		string operationId
 	);
@@ -117,12 +187,12 @@ interface IConfidentialATC {
 	);
 
 	/*
-	 * @notice Get the hold data.
+	 * Get the hold data.
 	 * @param operationId The id of the operation (hold).
 	 * @return fromAccount The sender account.
 	 * @return toAccount The receiver account.
 	 * @return notaryId The notary for the hold.
-	 * @return amount The encrypted hold amount.
+	 * @return amount The hold amount.
 	 * @return expiryTimestamp The expiry timestamp.
 	 * @return metaData The meta data.
 	 * @return holdStatus Returns the hold data.
@@ -135,7 +205,7 @@ interface IConfidentialATC {
 		string memory fromAccount,
 		string memory toAccount,
 		string memory notaryId,
-		euint64 amount,
+		uint256 amount,
 		uint256 expiryTimestamp,
 		string memory metaData,
 		bytes32 holdStatus,
@@ -155,7 +225,7 @@ interface IConfidentialATC {
 		address holdNotaryAdminAddress
 	) external returns (bool);
 
-	/* Event emitted after hold notary was added. */
+	/* @notice Event emitted after hold notary was added. */
 	event AddHoldNotaryExecuted(
 		string notaryId,
 		address holdNotaryAdminAddress
@@ -169,80 +239,4 @@ interface IConfidentialATC {
 	function isHoldNotary(
 		string calldata notaryId
 	) external view returns (bool);
-
-	/*
-	 * @notice Create tokens into the specified account.
-	 * @param operationId The id of the operation.
-	 * @param toAccount The account id.
-	 * @param amount The number of tokens.
-	 * @param metaData Any public meta data / instructions accompanying the operation.
-	 * @return A boolean indicating successful execution of the function.`
-	 */
-	function create(
-		string calldata operationId,
-		string calldata toAccount,
-		euint64 amount,
-		string calldata metaData
-	) external returns (bool);
-
-	/**
-	  * @notice Event emitted after tokens were created.
-	  */
-	event CreateExecuted(
-		string operationId,
-		string toAccount,
-		euint64 amount,
-		string metaData
-	);
-
-	/*
-	 * Destroy tokens from the specified account.
-	 * @param operationId The id of the operation.
-	 * @param fromAccount The account id.
-	 * @param amount The encrypted number of tokens.
-	 * @param metaData Any public meta data / instructions accompanying the operation.
-	 * @return A boolean indicating successful execution of the function.
-	 */
-	function destroy(
-		string calldata operationId,
-		string calldata fromAccount,
-		euint64 amount,
-		string calldata metaData
-	) external returns (bool);
-
-
-	/* @notice Event emitted after tokens were destroyed. */
-	event DestroyExecuted(
-		string operationId,
-		string fromAccount,
-		euint64 amount,
-		string metaData
-	);
-
-	/*
-	 * @notice Transfer tokens from one account to another.
-	 * @param operationId The id of the operation.
-	 * @param fromAccount The account id to transfer from.
-	 * @param toAccount The account id to transfer to.
-	 * @param amount The encrypted number of tokens.
-	 * @param metaData Any public meta data / instructions accompanying the operation.
-	 * @return Returns a boolean indicating successful execution of the function.
-	 */
-	function transfer(
-		string calldata operationId,
-		string calldata fromAccount,
-		string calldata toAccount,
-		euint64 amount,
-		string calldata metaData,
-		ebool isTransferable
-	) external returns (bool);
-
-	/* @notice Event emitted after tokens were destroyed. */
-	event TransferExecuted(
-		string operationId,
-		string fromAccount,
-		string toAccount,
-		euint64 amount,
-		string metaData
-	);
 }

@@ -2,52 +2,63 @@
 pragma solidity ^0.8.24;
 
 /**
- * @title   IConfidentialERC20Wrapped.
+ * @title   IConfidentialATCWrapped.
  * @notice  Interface that defines events, errors, and structs for
- *          contracts that wrap native assets or ERC20 tokens.
+ *          contracts that wrap native assets or AssetToken tokens.
  */
 interface IConfidentialATCWrapped {
-    /// @notice Returned if the amount is greater than 2**64.
+    /**
+      * @notice Returned if the amount is greater than 2**64.
+      */
     error AmountTooHigh();
 
-    /// @notice Returned if user cannot perform operation.
-    error CannotTransferOrUnwrap();
+    /**
+      * @notice Returned if user cannot perform operation.
+      */
+    error RestrictedAccount();
 
     /**
-     * @notice         Emitted when token is unwrapped.
-     * @param account  Address of the account that unwraps tokens.
-     * @param amount   Amount to unwrap.
+     * @notice          Emitted when token is unwrapped.
+     * @param accountId Account identifier of the account that unwraps tokens.
+     * @param amount    Amount to unwrap.
      */
-    event Unwrap(address indexed account, uint64 amount);
+    event Unwrap(string indexed accountId, uint64 amount);
 
     /**
-     * @notice         Emitted if unwrap fails due to lack of funds.
-     * @param account  Address of the account that tried to unwrap.
-     * @param amount   Amount to unwrap.
+     * @notice          Emitted if unwrap fails due to lack of funds.
+     * @param accountId Account identifier of the account that tried to unwrap.
+     * @param amount    Amount to unwrap.
      */
-    event UnwrapFailNotEnoughBalance(address account, uint64 amount);
+    event UnwrapFailNotEnoughBalance(string accountId, uint64 amount);
 
     /**
-     * @notice         Emitted if unwrap fails due to fail transfer.
-     * @param account  Address of the account that tried to unwrap.
+     * @notice         Emitted if unwrap fails due to failed transfer.
+     * @param accountId Account identifier of the account that tried to unwrap.
      * @param amount   Amount to unwrap.
      */
-    event UnwrapFailTransferFail(address account, uint64 amount);
+    event UnwrapFailTransferFail(string accountId, uint64 amount);
 
     /**
      * @notice         Emitted when token is wrapped.
-     * @param account  Address of the account that wraps tokens.
+     * @param accountId Account identifier of the account that wraps tokens.
      * @param amount   Amount to wrap.
      */
-    event Wrap(address indexed account, uint64 amount);
+    event Wrap(string indexed accountId, uint64 amount);
+
+    /**
+     * @notice          Emitted if wrap fails due to failed transfer.
+     * @param accountId Account identifier of the account that tried to wrap.
+     * @param amount    Amount to wrap.
+     */
+    event WrapFailTransferFail(string accountId, uint64 amount);
 
     /**
      * @notice          This struct keeps track of the unwrap request information.
-     * @param account   Address of the account that has initiated the unwrap request.
+     * @param accountId Account identifier of the account that has initiated the unwrap request.
      * @param amount    Amount to be unwrapped.
      */
     struct UnwrapRequest {
-        address account;
+        string accountId;
         uint64 amount;
     }
 }

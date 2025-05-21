@@ -3,19 +3,31 @@ pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
 import { IConfidentialATC } from "./IConfidentialATC.sol";
-import { TFHEErrors } from "../../utils/TFHEErrors.sol";
+import { TFHEErrors } from "../../../utils/TFHEErrors.sol";
 
 /**
  * @title   ConfidentialATC.
  * @notice  This contract implements an encrypted ATC-like token with confidential balances using
  *          Zama's FHE (Fully Homomorphic Encryption) library.
- * @dev     It supports standard ATC functions such as transferring tokens, minting,
+ * @dev     It supports standard ATC functions such as creating, destroying, transferring tokens,
  *          and placing holds, but uses encrypted data types.
  *          The total supply is not encrypted.
  */
 abstract contract ConfidentialATC is IConfidentialATC {
 
-  address public owner;
+  // @notice Used as a placeholder in `Transfer` events to comply with the official EIP20.
+  uint256 internal constant _PLACEHOLDER = type(uint256).max;
+
+  /* Hold status codes */
+  bytes32 internal constant _HOLD_STATUS_NON_EXISTENT = "";
+  bytes32 internal constant _HOLD_STATUS_NEW = "new";
+  bytes32 internal constant _HOLD_STATUS_PERPETUAL = "perpetual";
+  bytes32 internal constant _HOLD_STATUS_CANCELLED = "cancelled";
+  bytes32 internal constant _HOLD_STATUS_EXECUTED = "executed";
+
+  /* Hold types */
+  bytes32 internal constant _HOLD_TYPE_NORMAL = "normal";
+  bytes32 internal constant _HOLD_TYPE_DESTROY = "destroy";
 
   struct Hold {
     string fromAccount;
@@ -29,6 +41,12 @@ abstract contract ConfidentialATC is IConfidentialATC {
     bytes32 signer;
   }
 
+  address public owner;
+  string internal name;
+  string internal symbol;
+  uint8 internal decimals;
+  uint64 internal totalSupply;
+
   mapping(string => euint64) balances;
   mapping(string => Hold) holds;
   mapping(string => address) notaries;
@@ -36,19 +54,68 @@ abstract contract ConfidentialATC is IConfidentialATC {
   constructor(string memory tokenName, string memory tokenSymbol) {
     name = tokenName;
     symbol = tokenSymbol;
+    decimals = 6;
     owner = msg.sender;
   }
 
-  function decimals() public view virtual returns (uint8) {
-    return 6;
+  function create(
+    string calldata operationId,
+    string calldata toAccount,
+    euint64 amount,
+    string calldata metaData
+  ) external override returns (bool) {
+    requireContractOwner();
+
+    euint64 newBalanceAccount = TFHE.add(balances[toAccount], amount);
+    balances[toAccount] = newBalanceAccount;
+
+    emit CreateExecuted(operationId, toAccount, amount, metaData);
+    return true;
   }
 
-  function name() public view virtual returns (string memory) {
-    return "ATC";
+  function getAvailableBalanceOf(string calldata account) external override view returns (euint64) {
+    return balances[account];
   }
 
-  function symbol() public view virtual returns (string memory) {
-    return "USD";
+  function destroy(
+    string calldata operationId,
+    string calldata fromAccount,
+    euint64 amount,
+    string calldata metaData
+  ) external override returns (bool) {
+    requireContractOwner();
+
+    ebool canDestroy = TFHE.le(amount, balances[fromAccount]);
+    euint64 destroyValue = TFHE.select(canDestroy, amount, TFHE.asEuint64(0));
+
+    euint64 newFromBalance = TFHE.sub(balances[fromAccount], destroyValue);
+    balances[fromAccount] = newFromBalance;
+
+    emit DestroyExecuted(operationId, fromAccount, amount, metaData);
+    return true;
+  }
+
+  function transfer(
+    string calldata operationId,
+    string calldata fromAccount,
+    string calldata toAccount,
+    euint64 amount,
+    string calldata metaData,
+    ebool isTransferable
+  ) external override returns (bool) {
+    requireContractOwner();
+
+    ebool canTransfer = TFHE.and(isTransferable, TFHE.le(amount, balances[fromAccount]));
+    euint64 transferValue = TFHE.select(canTransfer, amount, TFHE.asEuint64(0));
+
+    euint64 newFromBalance = TFHE.sub(balances[fromAccount], transferValue);
+    balances[fromAccount] = newFromBalance;
+
+    euint64 newToBalance = TFHE.add(balances[toAccount], transferValue);
+    balances[toAccount] = newToBalance;
+
+    emit TransferExecuted(operationId, fromAccount, toAccount, amount, metaData);
+    return true;
   }
 
   function createHold(
@@ -60,11 +127,20 @@ abstract contract ConfidentialATC is IConfidentialATC {
     uint256 duration,
     string calldata metaData
   ) external override returns (bool) {
-    require(balances[fromAccount] >= amount, "Insufficient balance to place hold");
-    balances[fromAccount] -= amount;
-    Hold memory newHold = Hold(fromAccount, toAccount, notaryId, amount, uint256(0), metaData, IToken._HOLD_STATUS_PERPETUAL, IToken._HOLD_TYPE_NORMAL, "");
+    requireNonExistingHold(holds[operationId]);
+
+    ebool canHold = TFHE.le(amount, balances[fromAccount]);
+    euint64 holdValue = TFHE.select(canHold, amount, TFHE.asEuint64(0));
+
+    Hold memory newHold = Hold(fromAccount, toAccount, notaryId, holdValue, uint256(0), metaData, _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL, "");
+    requireValidHold(newHold);
+
+    euint64 newFromBalance = TFHE.sub(balances[fromAccount], holdValue);
+    balances[fromAccount] = newFromBalance;
+
     holds[operationId] = newHold;
-    //emit CreateHoldExecuted(operationId, fromAccount, toAccount, notaryId, amount, metaData);
+
+    emit CreateHoldExecuted(operationId, fromAccount, toAccount, notaryId, holdValue, metaData);
     return true;
   }
 
@@ -72,9 +148,14 @@ abstract contract ConfidentialATC is IConfidentialATC {
     string calldata operationId
   ) external override returns (bool) {
     Hold memory holdToExecute = holds[operationId];
-    require(keccak256(abi.encodePacked(holdToExecute.fromAccount)) != keccak256(abi.encodePacked("")), "Hold does not exist");
-    balances[holdToExecute.toAccount] += holdToExecute.amount;
+    requireExistingHold(holdToExecute);
+    requireExecutableHold(holdToExecute);
+
+    euint64 newToBalance = TFHE.add(balances[holdToExecute.toAccount], holdToExecute.amount);
+    balances[holdToExecute.toAccount] = newToBalance;
+
     delete holds[operationId];
+
     emit ExecuteHoldExecuted(operationId);
     return true;
   }
@@ -83,11 +164,30 @@ abstract contract ConfidentialATC is IConfidentialATC {
     string calldata operationId
   ) external override returns (bool) {
     Hold memory holdToCancel = holds[operationId];
-    require(keccak256(abi.encodePacked(holdToCancel.fromAccount)) != keccak256(abi.encodePacked("")), "Hold does not exist");
-    balances[holdToCancel.fromAccount] += holdToCancel.amount;
+    requireExistingHold(holdToCancel);
+    requireCancellableHold(holdToCancel);
+
+    euint64 newFromBalance = TFHE.add(balances[holdToCancel.fromAccount], holdToCancel.amount);
+    balances[holdToCancel.fromAccount] = newFromBalance;
+
     delete holds[operationId];
+
     emit CancelHoldExecuted(operationId);
     return true;
+  }
+
+  function addHoldNotary(
+    string calldata notaryId,
+    address holdNotaryAdminAddress
+  ) external override returns (bool) {
+    notaries[notaryId] = holdNotaryAdminAddress;
+    return true;
+  }
+
+  function isHoldNotary(
+    string calldata notaryId
+  ) external override view returns (bool) {
+    return notaries[notaryId] != address(0);
   }
 
   function getHoldData(string calldata operationId)
@@ -104,84 +204,64 @@ abstract contract ConfidentialATC is IConfidentialATC {
     bytes32 signer
   ) {
     Hold memory holdToReturn = holds[operationId];
+    requireExistingHold(holdToReturn);
 
-    if (keccak256(abi.encodePacked(holdToReturn.fromAccount)) == keccak256(abi.encodePacked(""))) {
-      holdToReturn.holdStatus = IToken._HOLD_STATUS_NON_EXISTENT;
-    }
-    //require(holdToReturn._holdStatus != IToken._HOLD_STATUS_NON_EXISTENT, "Hold does not exist");
     return (holdToReturn.fromAccount,
-            holdToReturn.toAccount,
-            holdToReturn.notaryId,
-            holdToReturn.amount,
-            holdToReturn.expiryTimestamp,
-            holdToReturn.metaData,
-            holdToReturn.holdStatus,
-            holdToReturn.holdType,
-            holdToReturn.signer);
+      holdToReturn.toAccount,
+      holdToReturn.notaryId,
+      holdToReturn.amount,
+      holdToReturn.expiryTimestamp,
+      holdToReturn.metaData,
+      holdToReturn.holdStatus,
+      holdToReturn.holdType,
+      holdToReturn.signer);
   }
 
-  function addHoldNotary(
-    string calldata notaryId,
-    address holdNotaryAdminAddress
+  function makeHoldPerpetual(
+    string calldata operationId
   ) external override returns (bool) {
-    notaries[notaryId] = holdNotaryAdminAddress;
-    return true;
-  }
-
-  function isHoldNotary(string calldata notaryId)
-  external override view returns (bool)
-  {
-    return notaries[notaryId] != address(0);
-  }
-
-  function makeHoldPerpetual(string calldata operationId)
-  external override returns (bool)
-  {
     Hold memory holdToChange = holds[operationId];
-    holdToChange.holdStatus = IConfidentialATC._HOLD_STATUS_PERPETUAL;
+    requireExistingHold(holdToChange);
+    holdToChange.holdStatus = _HOLD_STATUS_PERPETUAL;
+
     emit MakeHoldPerpetualExecuted(operationId);
     return true;
   }
 
-  function create(
-    string calldata operationId,
-    string calldata toAccount,
-    euint64 amount,
-    string calldata metaData
-  ) external override returns (bool) {
-    require(msg.sender == owner, "Only the owner can create new tokens");
-    balances[toAccount] += amount;
-    return true;
+  function requireContractOwner() internal view {
+    require(msg.sender == owner, "Only the contract owner has permission to perform this operation");
   }
 
-  function destroy(
-    string calldata operationId,
-    string calldata fromAccount,
-    euint64 amount,
-    string calldata metaData
-  ) external override returns (bool) {
-    require(msg.sender == owner, "Only the owner can destroy existing tokens");
-    require(balances[fromAccount] >= amount, "Not enough tokens in existence to destroy");
-    balances[fromAccount] -= amount;
-    return true;
+  function requireValidHold(
+    Hold memory hold
+  ) internal view {
+    require(keccak256(abi.encodePacked(hold.fromAccount)) != keccak256(abi.encodePacked("")), "Invalid sending account in hold data");
+    require(keccak256(abi.encodePacked(hold.toAccount)) != keccak256(abi.encodePacked("")), "Invalid receiving account in hold data");
   }
 
-  function transfer(
-    string calldata operationId,
-    string calldata fromAccount,
-    string calldata toAccount,
-    euint64 amount,
-    string calldata metaData
-  ) external override returns (bool) {
-    require(msg.sender == owner, "Only the owner can transfer tokens");
-    require(balances[fromAccount] >= amount, "Not enough tokens in existence to transfer");
-    balances[fromAccount] -= amount;
-    balances[toAccount] += amount;
-    return true;
+  function requireExistingHold(
+    Hold memory hold
+  ) internal view {
+    require(hold.holdStatus != _HOLD_STATUS_NON_EXISTENT, "Hold does not exist");
   }
 
-  function getAvailableBalanceOf(string calldata account) external override view returns (uint256) {
-    return balances[account];
+  function requireNonExistingHold(
+    Hold memory hold
+  ) internal view {
+    require(hold.holdStatus == _HOLD_STATUS_NON_EXISTENT, "Hold already exists");
+  }
+
+  function requireExecutableHold(
+    Hold memory hold
+  ) internal view {
+    require(hold.holdStatus == _HOLD_STATUS_PERPETUAL, "Hold is not executable");
+  }
+
+  function requireCancellableHold(
+    Hold memory hold
+  ) internal view {
+    require(hold.holdStatus == _HOLD_STATUS_NEW
+         || hold.holdStatus == _HOLD_STATUS_PERPETUAL, "Hold is not cancellable");
   }
 }
 
