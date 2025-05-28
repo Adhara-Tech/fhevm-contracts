@@ -19,11 +19,12 @@ export async function deployConfidentialATCFixture(
 
 export async function reEncryptBalance(
   account: Signer,
+  accountId: string,
   instance: FhevmInstance,
   token: IConfidentialATC,
   tokenAddress: string,
 ): Promise<bigint> {
-  const balanceHandle = await token.getAvailableBalanceOf(await account.getAddress());
+  const balanceHandle = await token.getAvailableBalanceOf(accountId);
   const balance = await reencryptEuint64(account, instance, balanceHandle, tokenAddress);
   return balance;
 }

@@ -33,14 +33,15 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
 
   struct Hold {
     string fromAccount;
+    address fromSigner;
     string toAccount;
+    address toSigner;
     string notaryId;
     euint64 amount;
     uint256 expiryTimestamp;
     string metaData;
     bytes32 holdStatus;
     bytes32 holdType;
-    bytes32 signer;
   }
 
   string internal _name;
@@ -74,52 +75,40 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     return _totalSupply;
   }
 
-//  function registerAccount(string calldata accountId, euint64 initialBalance)
-//  public virtual onlyOwner {
-//    _balances[accountId] = initialBalance;
-//    TFHE.allowThis(initialBalance);
-//    TFHE.allow(initialBalance, owner());
-//    emit RegisterAccountExecuted(accountId, initialBalance);
-//  }
-
-  function registerAccount(string calldata accountId)
+  function registerAccount(string calldata account, address signer)
   public virtual onlyOwner {
     euint64 initialBalance = TFHE.asEuint64(0);
-    _balances[accountId] = initialBalance;
+    _balances[account] = initialBalance;
     TFHE.allowThis(initialBalance);
-    TFHE.allow(initialBalance, owner());
-    emit RegisterAccountExecuted(accountId);
+    TFHE.allow(initialBalance, signer);
+
+    emit RegisterAccountExecuted(account, signer);
   }
 
   function create(
     string calldata operationId,
     string calldata toAccount,
+    address toSigner,
     uint64 amount,
     string calldata metaData
   ) public virtual onlyOwner {
-    _create(operationId, toAccount, amount, metaData);
-    emit CreateExecuted(operationId, toAccount, amount, metaData);
-  }
-
-  function _create(
-    string calldata operationId,
-    string calldata toAccount,
-    uint64 amount,
-    string calldata metaData
-  ) internal virtual {
     euint64 newToBalance = TFHE.add(_balances[toAccount], amount);
     _balances[toAccount] = newToBalance;
     TFHE.allowThis(newToBalance);
-    TFHE.allow(newToBalance, msg.sender);
+    TFHE.allow(newToBalance, toSigner);
+
+    emit CreateExecuted(operationId, toAccount, toSigner, amount, metaData);
   }
 
-  function getAvailableBalanceOf(string calldata account) external override view returns (euint64) {
+  function getAvailableBalanceOf(string calldata account)
+  external override view returns (euint64) {
     return _balances[account];
   }
 
   function destroy(
     string calldata operationId,
     string calldata fromAccount,
+    address fromSigner,
     euint64 amount,
     string calldata metaData
   ) external override {
@@ -130,15 +119,17 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     euint64 newFromBalance = TFHE.sub(_balances[fromAccount], destroyValue);
     _balances[fromAccount] = newFromBalance;
     TFHE.allowThis(newFromBalance);
-    //TFHE.allow(newFromBalance, fromAccount);
+    TFHE.allow(newFromBalance, fromSigner);
 
-    emit DestroyExecuted(operationId, fromAccount, amount, metaData);
+    emit DestroyExecuted(operationId, fromAccount, fromSigner, amount, metaData);
   }
 
   function transfer(
     string calldata operationId,
     string calldata fromAccount,
+    address fromSigner,
     string calldata toAccount,
+    address toSigner,
     euint64 amount,
     string calldata metaData,
     ebool isTransferable
@@ -150,21 +141,23 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     euint64 newFromBalance = TFHE.sub(_balances[fromAccount], transferValue);
     _balances[fromAccount] = newFromBalance;
     TFHE.allowThis(newFromBalance);
-    //TFHE.allow(newFromBalance, fromAccount);
+    TFHE.allow(newFromBalance, fromSigner);
 
     euint64 newToBalance = TFHE.add(_balances[toAccount], transferValue);
     _balances[toAccount] = newToBalance;
     TFHE.allowThis(newToBalance);
-    //TFHE.allow(newToBalance, toAccount);
+    TFHE.allow(newToBalance, toSigner);
 
-    emit TransferExecuted(operationId, fromAccount, toAccount, amount, metaData);
+    emit TransferExecuted(operationId, fromAccount, fromSigner, toAccount, toSigner, amount, metaData);
     return true;
   }
 
   function createHold(
     string calldata operationId,
     string calldata fromAccount,
+    address fromSigner,
     string calldata toAccount,
+    address toSigner,
     string calldata notaryId,
     euint64 amount,
     uint256 duration,
@@ -175,17 +168,17 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     ebool canHold = TFHE.le(amount, _balances[fromAccount]);
     euint64 holdValue = TFHE.select(canHold, amount, TFHE.asEuint64(0));
 
-    Hold memory newHold = Hold(fromAccount, toAccount, notaryId, holdValue, uint256(0), metaData, _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL, "");
+    Hold memory newHold = Hold(fromAccount, fromSigner,toAccount, toSigner, notaryId, holdValue, uint256(0), metaData, _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL);
     requireValidHold(newHold);
 
     euint64 newFromBalance = TFHE.sub(_balances[fromAccount], holdValue);
     _balances[fromAccount] = newFromBalance;
     TFHE.allowThis(newFromBalance);
-    //TFHE.allow(newFromBalance, fromAccount);
+    TFHE.allow(newFromBalance, fromSigner);
 
     _holds[operationId] = newHold;
 
-    emit CreateHoldExecuted(operationId, fromAccount, toAccount, notaryId, holdValue, metaData);
+    emit CreateHoldExecuted(operationId, fromAccount, fromSigner, toAccount, toSigner, notaryId, holdValue, metaData);
     return true;
   }
 
@@ -199,7 +192,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     euint64 newToBalance = TFHE.add(_balances[holdToExecute.toAccount], holdToExecute.amount);
     _balances[holdToExecute.toAccount] = newToBalance;
     TFHE.allowThis(newToBalance);
-    //TFHE.allow(newToBalance, holdToExecute.toAccount);
+    TFHE.allow(newToBalance, holdToExecute.toSigner);
 
     delete _holds[operationId];
 
@@ -217,7 +210,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     euint64 newFromBalance = TFHE.add(_balances[holdToCancel.fromAccount], holdToCancel.amount);
     _balances[holdToCancel.fromAccount] = newFromBalance;
     TFHE.allowThis(newFromBalance);
-    //TFHE.allow(newFromBalance, holdToCancel.fromAccount);
+    TFHE.allow(newFromBalance, holdToCancel.fromSigner);
 
     delete _holds[operationId];
 
@@ -243,27 +236,27 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
   external override view virtual
   returns (
     string memory fromAccount,
+    address fromSigner,
     string memory toAccount,
+    address toSigner,
     string memory notaryId,
     euint64 amount,
     uint256 expiryTimestamp,
     string memory metaData,
     bytes32 holdStatus,
-    bytes32 holdType,
-    bytes32 signer
+    bytes32 holdType
   ) {
     Hold memory holdToReturn = _holds[operationId];
     requireExistingHold(holdToReturn);
 
-    return (holdToReturn.fromAccount,
-      holdToReturn.toAccount,
+    return (holdToReturn.fromAccount, holdToReturn.fromSigner,
+      holdToReturn.toAccount, holdToReturn.toSigner,
       holdToReturn.notaryId,
       holdToReturn.amount,
       holdToReturn.expiryTimestamp,
       holdToReturn.metaData,
       holdToReturn.holdStatus,
-      holdToReturn.holdType,
-      holdToReturn.signer);
+      holdToReturn.holdType);
   }
 
   function makeHoldPerpetual(
@@ -307,6 +300,17 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
   ) internal view {
     require(hold.holdStatus == _HOLD_STATUS_NEW
          || hold.holdStatus == _HOLD_STATUS_PERPETUAL, "Hold is not cancellable");
+  }
+
+  function stringToRepresentativeAddress(string memory str) public pure returns (address addr) {
+    bytes memory strBytes = bytes(str);
+    // Copy first 20 bytes
+    bytes20 truncated;
+    assembly {
+      truncated := mload(add(strBytes, 32)) // skip length prefix
+    }
+
+    return address(truncated);
   }
 }
 
