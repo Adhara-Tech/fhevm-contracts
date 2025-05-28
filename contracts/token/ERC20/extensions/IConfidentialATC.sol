@@ -170,6 +170,12 @@ interface IConfidentialATC {
 		string calldata notaryId
 	) external view returns (bool);
 
+
+	//function registerAccount(string calldata accountId, euint64 initialBalance) external;
+	function registerAccount(string calldata accountId) external;
+
+	event RegisterAccountExecuted(string accountId);
+
 	/*
 	 * @notice Create tokens into the specified account.
 	 * @param operationId The id of the operation.
@@ -181,9 +187,9 @@ interface IConfidentialATC {
 	function create(
 		string calldata operationId,
 		string calldata toAccount,
-		euint64 amount,
+		uint64 amount,
 		string calldata metaData
-	) external returns (bool);
+	) external;
 
 	/**
 	  * @notice Event emitted after tokens were created.
@@ -191,7 +197,7 @@ interface IConfidentialATC {
 	event CreateExecuted(
 		string operationId,
 		string toAccount,
-		euint64 amount,
+		uint64 amount,
 		string metaData
 	);
 
@@ -208,7 +214,7 @@ interface IConfidentialATC {
 		string calldata fromAccount,
 		euint64 amount,
 		string calldata metaData
-	) external returns (bool);
+	) external;
 
 
 	/* @notice Event emitted after tokens were destroyed. */

@@ -46,7 +46,7 @@ interface IATC {
 		string calldata toAccount,
 		uint256 amount,
 		string calldata metaData
-	) external returns (bool);
+	) external;
 
 	/* @notice Event emitted after tokens were created. */
 	event CreateExecuted(
@@ -69,7 +69,7 @@ interface IATC {
 		string calldata fromAccount,
 		uint256 amount,
 		string calldata metaData
-	) external returns (bool);
+	) external;
 
 	/* Event emitted after tokens were destroyed. */
 	event DestroyExecuted(

@@ -2,8 +2,10 @@
 pragma solidity ^0.8.24;
 
 import "fhevm/lib/TFHE.sol";
-import { IConfidentialATC } from "./IConfidentialATC.sol";
+import { Ownable2Step, Ownable } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import { TFHEErrors } from "../../../utils/TFHEErrors.sol";
+import { IConfidentialATC } from "./IConfidentialATC.sol";
+
 
 /**
  * @title   ConfidentialATC.
@@ -13,7 +15,7 @@ import { TFHEErrors } from "../../../utils/TFHEErrors.sol";
  *          and placing holds, but uses encrypted data types.
  *          The total supply is not encrypted.
  */
-abstract contract ConfidentialATC is IConfidentialATC {
+abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step {
 
   // @notice Used as a placeholder in `Transfer` events to comply with the official EIP20.
   uint256 internal constant _PLACEHOLDER = type(uint256).max;
@@ -41,40 +43,78 @@ abstract contract ConfidentialATC is IConfidentialATC {
     bytes32 signer;
   }
 
-  address public owner;
-  string internal name;
-  string internal symbol;
-  uint8 internal decimals;
-  uint64 internal totalSupply;
+  string internal _name;
+  string internal _symbol;
+  uint8 internal _decimals;
+  uint64 internal _totalSupply;
 
-  mapping(string => euint64) balances;
-  mapping(string => Hold) holds;
-  mapping(string => address) notaries;
+  mapping(string => euint64) _balances;
+  mapping(string => Hold) _holds;
+  mapping(string => address) _notaries;
 
-  constructor(string memory tokenName, string memory tokenSymbol) {
-    name = tokenName;
-    symbol = tokenSymbol;
-    decimals = 6;
-    owner = msg.sender;
+  constructor(string memory tokenName, string memory tokenSymbol, address tokenOwner) Ownable(tokenOwner) {
+    _name = tokenName;
+    _symbol = tokenSymbol;
+    _decimals = 6;
+  }
+
+  function decimals() public view virtual returns (uint8) {
+    return _decimals;
+  }
+
+  function name() public view virtual returns (string memory) {
+    return _name;
+  }
+
+  function symbol() public view virtual returns (string memory) {
+    return _symbol;
+  }
+
+  function totalSupply() public view virtual returns (uint64) {
+    return _totalSupply;
+  }
+
+//  function registerAccount(string calldata accountId, euint64 initialBalance)
+//  public virtual onlyOwner {
+//    _balances[accountId] = initialBalance;
+//    TFHE.allowThis(initialBalance);
+//    TFHE.allow(initialBalance, owner());
+//    emit RegisterAccountExecuted(accountId, initialBalance);
+//  }
+
+  function registerAccount(string calldata accountId)
+  public virtual onlyOwner {
+    euint64 initialBalance = TFHE.asEuint64(0);
+    _balances[accountId] = initialBalance;
+    TFHE.allowThis(initialBalance);
+    TFHE.allow(initialBalance, owner());
+    emit RegisterAccountExecuted(accountId);
   }
 
   function create(
     string calldata operationId,
     string calldata toAccount,
-    euint64 amount,
+    uint64 amount,
     string calldata metaData
-  ) external override returns (bool) {
-    requireContractOwner();
-
-    euint64 newBalanceAccount = TFHE.add(balances[toAccount], amount);
-    balances[toAccount] = newBalanceAccount;
-
+  ) public virtual onlyOwner {
+    _create(operationId, toAccount, amount, metaData);
     emit CreateExecuted(operationId, toAccount, amount, metaData);
-    return true;
+  }
+
+  function _create(
+    string calldata operationId,
+    string calldata toAccount,
+    uint64 amount,
+    string calldata metaData
+  ) internal virtual {
+    euint64 newToBalance = TFHE.add(_balances[toAccount], amount);
+    _balances[toAccount] = newToBalance;
+    TFHE.allowThis(newToBalance);
+    TFHE.allow(newToBalance, msg.sender);
   }
 
   function getAvailableBalanceOf(string calldata account) external override view returns (euint64) {
-    return balances[account];
+    return _balances[account];
   }
 
   function destroy(
@@ -82,17 +122,17 @@ abstract contract ConfidentialATC is IConfidentialATC {
     string calldata fromAccount,
     euint64 amount,
     string calldata metaData
-  ) external override returns (bool) {
-    requireContractOwner();
+  ) external override {
 
-    ebool canDestroy = TFHE.le(amount, balances[fromAccount]);
+    ebool canDestroy = TFHE.le(amount, _balances[fromAccount]);
     euint64 destroyValue = TFHE.select(canDestroy, amount, TFHE.asEuint64(0));
 
-    euint64 newFromBalance = TFHE.sub(balances[fromAccount], destroyValue);
-    balances[fromAccount] = newFromBalance;
+    euint64 newFromBalance = TFHE.sub(_balances[fromAccount], destroyValue);
+    _balances[fromAccount] = newFromBalance;
+    TFHE.allowThis(newFromBalance);
+    //TFHE.allow(newFromBalance, fromAccount);
 
     emit DestroyExecuted(operationId, fromAccount, amount, metaData);
-    return true;
   }
 
   function transfer(
@@ -103,16 +143,19 @@ abstract contract ConfidentialATC is IConfidentialATC {
     string calldata metaData,
     ebool isTransferable
   ) external override returns (bool) {
-    requireContractOwner();
 
-    ebool canTransfer = TFHE.and(isTransferable, TFHE.le(amount, balances[fromAccount]));
+    ebool canTransfer = TFHE.and(isTransferable, TFHE.le(amount, _balances[fromAccount]));
     euint64 transferValue = TFHE.select(canTransfer, amount, TFHE.asEuint64(0));
 
-    euint64 newFromBalance = TFHE.sub(balances[fromAccount], transferValue);
-    balances[fromAccount] = newFromBalance;
+    euint64 newFromBalance = TFHE.sub(_balances[fromAccount], transferValue);
+    _balances[fromAccount] = newFromBalance;
+    TFHE.allowThis(newFromBalance);
+    //TFHE.allow(newFromBalance, fromAccount);
 
-    euint64 newToBalance = TFHE.add(balances[toAccount], transferValue);
-    balances[toAccount] = newToBalance;
+    euint64 newToBalance = TFHE.add(_balances[toAccount], transferValue);
+    _balances[toAccount] = newToBalance;
+    TFHE.allowThis(newToBalance);
+    //TFHE.allow(newToBalance, toAccount);
 
     emit TransferExecuted(operationId, fromAccount, toAccount, amount, metaData);
     return true;
@@ -127,18 +170,20 @@ abstract contract ConfidentialATC is IConfidentialATC {
     uint256 duration,
     string calldata metaData
   ) external override returns (bool) {
-    requireNonExistingHold(holds[operationId]);
+    requireNonExistingHold(_holds[operationId]);
 
-    ebool canHold = TFHE.le(amount, balances[fromAccount]);
+    ebool canHold = TFHE.le(amount, _balances[fromAccount]);
     euint64 holdValue = TFHE.select(canHold, amount, TFHE.asEuint64(0));
 
     Hold memory newHold = Hold(fromAccount, toAccount, notaryId, holdValue, uint256(0), metaData, _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL, "");
     requireValidHold(newHold);
 
-    euint64 newFromBalance = TFHE.sub(balances[fromAccount], holdValue);
-    balances[fromAccount] = newFromBalance;
+    euint64 newFromBalance = TFHE.sub(_balances[fromAccount], holdValue);
+    _balances[fromAccount] = newFromBalance;
+    TFHE.allowThis(newFromBalance);
+    //TFHE.allow(newFromBalance, fromAccount);
 
-    holds[operationId] = newHold;
+    _holds[operationId] = newHold;
 
     emit CreateHoldExecuted(operationId, fromAccount, toAccount, notaryId, holdValue, metaData);
     return true;
@@ -147,14 +192,16 @@ abstract contract ConfidentialATC is IConfidentialATC {
   function executeHold(
     string calldata operationId
   ) external override returns (bool) {
-    Hold memory holdToExecute = holds[operationId];
+    Hold memory holdToExecute = _holds[operationId];
     requireExistingHold(holdToExecute);
     requireExecutableHold(holdToExecute);
 
-    euint64 newToBalance = TFHE.add(balances[holdToExecute.toAccount], holdToExecute.amount);
-    balances[holdToExecute.toAccount] = newToBalance;
+    euint64 newToBalance = TFHE.add(_balances[holdToExecute.toAccount], holdToExecute.amount);
+    _balances[holdToExecute.toAccount] = newToBalance;
+    TFHE.allowThis(newToBalance);
+    //TFHE.allow(newToBalance, holdToExecute.toAccount);
 
-    delete holds[operationId];
+    delete _holds[operationId];
 
     emit ExecuteHoldExecuted(operationId);
     return true;
@@ -163,14 +210,16 @@ abstract contract ConfidentialATC is IConfidentialATC {
   function cancelHold(
     string calldata operationId
   ) external override returns (bool) {
-    Hold memory holdToCancel = holds[operationId];
+    Hold memory holdToCancel = _holds[operationId];
     requireExistingHold(holdToCancel);
     requireCancellableHold(holdToCancel);
 
-    euint64 newFromBalance = TFHE.add(balances[holdToCancel.fromAccount], holdToCancel.amount);
-    balances[holdToCancel.fromAccount] = newFromBalance;
+    euint64 newFromBalance = TFHE.add(_balances[holdToCancel.fromAccount], holdToCancel.amount);
+    _balances[holdToCancel.fromAccount] = newFromBalance;
+    TFHE.allowThis(newFromBalance);
+    //TFHE.allow(newFromBalance, holdToCancel.fromAccount);
 
-    delete holds[operationId];
+    delete _holds[operationId];
 
     emit CancelHoldExecuted(operationId);
     return true;
@@ -180,14 +229,14 @@ abstract contract ConfidentialATC is IConfidentialATC {
     string calldata notaryId,
     address holdNotaryAdminAddress
   ) external override returns (bool) {
-    notaries[notaryId] = holdNotaryAdminAddress;
+    _notaries[notaryId] = holdNotaryAdminAddress;
     return true;
   }
 
   function isHoldNotary(
     string calldata notaryId
   ) external override view returns (bool) {
-    return notaries[notaryId] != address(0);
+    return _notaries[notaryId] != address(0);
   }
 
   function getHoldData(string calldata operationId)
@@ -203,7 +252,7 @@ abstract contract ConfidentialATC is IConfidentialATC {
     bytes32 holdType,
     bytes32 signer
   ) {
-    Hold memory holdToReturn = holds[operationId];
+    Hold memory holdToReturn = _holds[operationId];
     requireExistingHold(holdToReturn);
 
     return (holdToReturn.fromAccount,
@@ -220,16 +269,12 @@ abstract contract ConfidentialATC is IConfidentialATC {
   function makeHoldPerpetual(
     string calldata operationId
   ) external override returns (bool) {
-    Hold memory holdToChange = holds[operationId];
+    Hold memory holdToChange = _holds[operationId];
     requireExistingHold(holdToChange);
     holdToChange.holdStatus = _HOLD_STATUS_PERPETUAL;
 
     emit MakeHoldPerpetualExecuted(operationId);
     return true;
-  }
-
-  function requireContractOwner() internal view {
-    require(msg.sender == owner, "Only the contract owner has permission to perform this operation");
   }
 
   function requireValidHold(
