@@ -2,7 +2,7 @@ import { expect } from "chai";
 
 import { createInstance } from "../instance";
 import { getSigners, initSigners } from "../signers";
-import { deployConfidentialATCFixture, reEncryptBalance } from "./ConfidentialATC.fixture";
+import { deployConfidentialATCFixture, reEncryptBalance, reEncryptUint64 } from "./ConfidentialATC.fixture";
 
 describe.only("ConfidentialATC", function () {
   // @dev The placeholder is type(uint256).max --> 2**256 - 1.
@@ -32,38 +32,31 @@ describe.only("ConfidentialATC", function () {
     expect(await this.confidentialATC.decimals()).to.be.eq(BigInt(6));
   });
 
-  it.only("should create token in the contract", async function () {
-    const account = "alice";
+  it.only("should create tokens in the contract", async function () {
+    const fromAccount = "alice";
     const createAmount = 1000;
-    const addr = await this.signers.alice.getAddress()
 
-    const registerTx = await this.confidentialATC.connect(this.signers.alice).registerAccount(account, addr);
-    await expect(registerTx).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(account, addr);
+    const registerTx = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount , this.signers.alice.address);
+    await expect(registerTx).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount , this.signers.alice.address);
 
-    const encryptedBalance = await this.confidentialATC.getAvailableBalanceOf(account);
-    console.log("Encrypted Balance:", encryptedBalance);
-
-    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", account, addr, createAmount, "");
-    await expect(createTx).to.emit(this.confidentialATC, "CreateExecuted").withArgs("operationId", account, addr, createAmount, "");
+    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount , this.signers.alice.address, createAmount, "");
+    await expect(createTx).to.emit(this.confidentialATC, "CreateExecuted").withArgs("operationId", fromAccount , this.signers.alice.address, createAmount, "");
 
     expect(
-      await reEncryptBalance(this.signers.alice, account, this.instance, this.confidentialATC, this.confidentialATCAddress),
+      await reEncryptBalance(this.signers.alice, fromAccount , this.instance, this.confidentialATC, this.confidentialATCAddress),
     ).to.equal(createAmount);
   });
 
   it.only("should transfer tokens between two users", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
-    const createAmount = 1000;
+    const createAmount = 2000;
     const transferAmount = 1337;
-
 
     const registerFrom = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount, this.signers.alice.address);
     await expect(registerFrom).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount, this.signers.alice.address);
-
     const registerTo = await this.confidentialATC.connect(this.signers.alice).registerAccount(toAccount, this.signers.bob.address);
     await expect(registerTo).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(toAccount, this.signers.bob.address);
-
     const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount, this.signers.alice.address, createAmount, "");
     await createTx.wait();
 
@@ -71,226 +64,186 @@ describe.only("ConfidentialATC", function () {
     input.add64(transferAmount);
     const encryptedTransferAmount = await input.encrypt();
 
-    const isTransferable = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.alice.address);
-    input.addBool(true);
-    const encryptedBool = await isTransferable.encrypt();
+    const tx = await this.confidentialATC.connect(this.signers.alice)[
+      "transfer(string,string,address,string,address,bytes32,bytes,string)"
+      ](
+        "operationId",
+        fromAccount,
+        this.signers.alice.address,
+        toAccount,
+        this.signers.bob.address,
+        encryptedTransferAmount.handles[0],
+        encryptedTransferAmount.inputProof,
+        ""
+      );
+    let result = await tx.wait();
+    expect(result.status).to.equal(1);
 
-    const tx = await this.confidentialATC.connect(this.signers.alice).transfer("operationId",
+    const events = await this.confidentialATC.queryFilter(
+      this.confidentialATC.filters.TransferExecuted(),
+      result.blockNumber
+    );
+    expect(events.length).to.be.greaterThan(0);
+    const event = events[0].args;
+    expect(event.operationId).to.equal("operationId");
+    expect(event.fromAccount).to.equal(fromAccount);
+    expect(event.fromSigner).to.equal(this.signers.alice.address);
+    expect(event.toAccount).to.equal(toAccount);
+    expect(event.toSigner).to.equal(this.signers.bob.address);
+    expect(await reEncryptUint64(this.signers.alice, this.instance, this.confidentialATCAddress, event.amount)).to.equal(transferAmount)
+    expect(await reEncryptUint64(this.signers.bob, this.instance, this.confidentialATCAddress, event.amount)).to.equal(transferAmount)
+    await expect(reEncryptUint64(this.signers.carol, this.instance, this.confidentialATCAddress, event.amount)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
+    expect(event.metaData).to.equal("");
+    expect(await reEncryptBalance(this.signers.alice, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(createAmount - transferAmount);
+    expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(transferAmount);
+  });
+
+  it.only("should not transfer tokens between two users if transfer amount is higher than balance", async function () {
+    const fromAccount = "alice";
+    const toAccount = "bob";
+    const createAmount = 1000;
+    const transferAmount = 1337;
+
+    const registerFrom = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount, this.signers.alice.address);
+    await expect(registerFrom).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount, this.signers.alice.address);
+    const registerTo = await this.confidentialATC.connect(this.signers.alice).registerAccount(toAccount, this.signers.bob.address);
+    await expect(registerTo).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(toAccount, this.signers.bob.address);
+    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount, this.signers.alice.address, createAmount, "");
+    await createTx.wait();
+    const input = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.alice.address);
+    input.add64(transferAmount);
+    const encryptedTransferAmount = await input.encrypt();
+
+    const tx = await this.confidentialATC.connect(this.signers.alice)[
+      "transfer(string,string,address,string,address,bytes32,bytes,string)"
+      ](
+      "operationId",
       fromAccount,
       this.signers.alice.address,
       toAccount,
       this.signers.bob.address,
       encryptedTransferAmount.handles[0],
-      "",
-      encryptedBool.handles[0]);
+      encryptedTransferAmount.inputProof,
+      ""
+    );
+    let result = await tx.wait();
+    expect(result.status).to.equal(1);
 
-    // await expect(tx)
-    //   .to.emit(this.confidentialATC, "Transfer")
-    //   .withArgs(this.signers.alice, this.signers.bob, PLACEHOLDER);
-    //
-    // // Decrypt Alice's balance
-    // expect(
-    //   await reEncryptBalance(this.signers.alice, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    // ).to.equal(createAmount - transferAmount);
-    //
-    // // Decrypt Bob's balance
-    // expect(
-    //   await reEncryptBalance(this.signers.bob, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    // ).to.equal(transferAmount);
+
+    expect(await reEncryptBalance(this.signers.alice, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(createAmount);
+    expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
   });
 
-  it("should not transfer tokens between two users if transfer amount is higher than balance", async function () {
-    // @dev There is no transfer done since the create amount is smaller than the transfer
-    //      amount.
-    const createAmount = 1000;
-    const transferAmount = 1337;
+  it.only("should create hold if balance is sufficient", async function () {
+    const fromAccount = "alice";
+    const toAccount = "bob";
+    const createAmount = 2000;
+    const holdAmount = 1337;
 
-    let tx = await this.confidentialATC.connect(this.signers.alice).create(this.signers.alice, createAmount);
-    await tx.wait();
-
+    const registerFrom = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount, this.signers.alice.address);
+    await expect(registerFrom).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount, this.signers.alice.address);
+    const registerTo = await this.confidentialATC.connect(this.signers.alice).registerAccount(toAccount, this.signers.bob.address);
+    await expect(registerTo).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(toAccount, this.signers.bob.address);
+    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount, this.signers.alice.address, createAmount, "");
+    await createTx.wait();
     const input = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.alice.address);
-    input.add64(transferAmount);
-    const encryptedTransferAmount = await input.encrypt();
+    input.add64(holdAmount);
+    const encryptedHoldAmount = await input.encrypt();
 
-    tx = await this.confidentialATC["transfer(address,bytes32,bytes)"](
-      this.signers.bob.address,
-      encryptedTransferAmount.handles[0],
-      encryptedTransferAmount.inputProof,
-    );
-
-    // @dev There is no error-handling in this version of ConfidentialATC.
-    await expect(tx)
-      .to.emit(this.confidentialATC, "Transfer")
-      .withArgs(this.signers.alice, this.signers.bob, PLACEHOLDER);
-
-    // Decrypt Alice's balance
-    expect(
-      await reEncryptBalance(this.signers.alice, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    ).to.equal(createAmount);
-
-    // Decrypt Bob's balance
-    expect(
-      await reEncryptBalance(this.signers.bob, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    ).to.equal(0);
-  });
-
-  it("should be able to transferFrom only if allowance is sufficient", async function () {
-    // @dev There is no transfer done since the create amount is smaller than the transfer
-    //      amount.
-    const createAmount = 10_000;
-    const transferAmount = 1337;
-
-    let tx = await this.confidentialATC.connect(this.signers.alice).create(this.signers.alice, createAmount);
-    await tx.wait();
-
-    const inputAlice = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.alice.address);
-    inputAlice.add64(transferAmount);
-    const encryptedAllowanceAmount = await inputAlice.encrypt();
-
-    tx = await this.confidentialATC["approve(address,bytes32,bytes)"](
-      this.signers.bob.address,
-      encryptedAllowanceAmount.handles[0],
-      encryptedAllowanceAmount.inputProof,
-    );
-
-    await expect(tx)
-      .to.emit(this.confidentialATC, "Approval")
-      .withArgs(this.signers.alice, this.signers.bob, PLACEHOLDER);
-
-    // @dev The allowance amount is set to be equal to the transfer amount.
-    // expect(
-    //   await reEncryptAllowance(
-    //     this.signers.alice,
-    //     this.signers.bob,
-    //     this.instance,
-    //     this.confidentialATC,
-    //     this.confidentialATCAddress,
-    //   ),
-    // ).to.equal(transferAmount);
-
-    const bobErc20 = this.confidentialATC.connect(this.signers.bob);
-    const inputBob1 = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.bob.address);
-    inputBob1.add64(transferAmount + 1); // above allowance so next tx should actually not send any token
-    const encryptedTransferAmount = await inputBob1.encrypt();
-
-    const tx2 = await bobErc20["transferFrom(address,address,bytes32,bytes)"](
+    const tx = await this.confidentialATC.connect(this.signers.alice)[
+      "createHold(string,string,address,string,address,string,bytes32,bytes,uint256)"
+      ](
+      "operationId",
+      fromAccount,
       this.signers.alice.address,
+      toAccount,
       this.signers.bob.address,
-      encryptedTransferAmount.handles[0],
-      encryptedTransferAmount.inputProof,
+      "notaryId",
+      encryptedHoldAmount.handles[0],
+      encryptedHoldAmount.inputProof,
+      0
     );
+    let result = await tx.wait();
+    expect(result.status).to.equal(1);
 
-    await expect(tx2)
-      .to.emit(this.confidentialATC, "Transfer")
-      .withArgs(this.signers.alice, this.signers.bob, PLACEHOLDER);
+    const events = await this.confidentialATC.queryFilter(
+      this.confidentialATC.filters.CreateHoldExecuted(),
+      result.blockNumber
+    );
+    expect(events.length).to.be.greaterThan(0);
+    const event = events[0].args;
+    expect(event.operationId).to.equal("operationId");
+    expect(event.fromAccount).to.equal(fromAccount);
+    expect(event.fromSigner).to.equal(this.signers.alice.address);
+    expect(event.toAccount).to.equal(toAccount);
+    expect(event.toSigner).to.equal(this.signers.bob.address);
+    expect(event.notaryId).to.equal("notaryId");
+    expect(await reEncryptUint64(this.signers.alice, this.instance, this.confidentialATCAddress, event.amount)).to.equal(holdAmount)
+    expect(await reEncryptUint64(this.signers.bob, this.instance, this.confidentialATCAddress, event.amount)).to.equal(holdAmount)
+    await expect(reEncryptUint64(this.signers.carol, this.instance, this.confidentialATCAddress, event.amount)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
+    expect(await reEncryptBalance(this.signers.alice, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(createAmount - holdAmount);
+    expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
+  });
 
-    // Decrypt Alice's balance
-    expect(
-      await reEncryptBalance(this.signers.alice, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    ).to.equal(createAmount); // check that transfer did not happen, as expected
+  it.only("should create hold with zero amount if balance is sufficient", async function () {
+    const fromAccount = "alice";
+    const toAccount = "bob";
+    const createAmount = 1000;
+    const holdAmount = 1337;
 
-    // Decrypt Bob's balance
-    expect(
-      await reEncryptBalance(this.signers.bob, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    ).to.equal(0); // check that transfer did not happen, as expected
+    const registerFrom = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount, this.signers.alice.address);
+    await expect(registerFrom).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount, this.signers.alice.address);
+    const registerTo = await this.confidentialATC.connect(this.signers.alice).registerAccount(toAccount, this.signers.bob.address);
+    await expect(registerTo).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(toAccount, this.signers.bob.address);
+    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount, this.signers.alice.address, createAmount, "");
+    await createTx.wait();
+    const input = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.alice.address);
+    input.add64(holdAmount);
+    const encryptedHoldAmount = await input.encrypt();
 
-    const inputBob2 = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.bob.address);
-    inputBob2.add64(transferAmount); // below allowance so next tx should send token
-    const encryptedTransferAmount2 = await inputBob2.encrypt();
-
-    const tx3 = await bobErc20["transferFrom(address,address,bytes32,bytes)"](
+    const tx = await this.confidentialATC.connect(this.signers.alice)[
+      "createHold(string,string,address,string,address,string,bytes32,bytes,uint256)"
+      ](
+      "operationId",
+      fromAccount,
       this.signers.alice.address,
+      toAccount,
       this.signers.bob.address,
-      encryptedTransferAmount2.handles[0],
-      encryptedTransferAmount2.inputProof,
+      "notaryId",
+      encryptedHoldAmount.handles[0],
+      encryptedHoldAmount.inputProof,
+      0
     );
-    await tx3.wait();
+    let result = await tx.wait();
+    expect(result.status).to.equal(1);
 
-    // Decrypt Alice's balance
-    expect(
-      await reEncryptBalance(this.signers.alice, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    ).to.equal(createAmount - transferAmount); // check that transfer did happen this time
-
-    // Decrypt Bob's balance
-    expect(
-      await reEncryptBalance(this.signers.bob, this.instance, this.confidentialATC, this.confidentialATCAddress),
-    ).to.equal(transferAmount); // check that transfer did happen this time
-
-    // Verify Alice's allowance is 0
-    // expect(
-    //   await reEncryptAllowance(
-    //     this.signers.alice,
-    //     this.signers.bob,
-    //     this.instance,
-    //     this.confidentialATC,
-    //     this.confidentialATCAddress,
-    //   ),
-    // ).to.equal(0);
+    expect(await reEncryptBalance(this.signers.alice, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(createAmount);
+    expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
+    const holdData = await this.confidentialATC.connect(this.signers.alice).getHoldData("operationId")
+    expect(holdData.fromAccount).to.equal(fromAccount);
+    expect(holdData.fromSigner).to.equal(this.signers.alice.address);
+    expect(holdData.toAccount).to.equal(toAccount);
+    expect(holdData.toSigner).to.equal(this.signers.bob.address);
+    expect(holdData.notaryId).to.equal("notaryId")
+    expect(holdData.expiryTimestamp).to.equal(0n);
+    expect(holdData.holdStatus).to.equal("0x70657270657475616c0000000000000000000000000000000000000000000000");
+    expect(holdData.holdType).to.equal("0x6e6f726d616c0000000000000000000000000000000000000000000000000000");
+    expect(await reEncryptUint64(this.signers.alice, this.instance, this.confidentialATCAddress, holdData.amount)).to.equal(0)
+    expect(await reEncryptUint64(this.signers.bob, this.instance, this.confidentialATCAddress, holdData.amount)).to.equal(0)
+    await expect(reEncryptUint64(this.signers.carol, this.instance, this.confidentialATCAddress, holdData.amount)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
   });
 
-  it("should not be able to read the allowance if not spender/owner after initialization", async function () {
-    const amount = 10_000;
+  it.only("should not be able to read the balance if not user after initialization", async function () {
+    const fromAccount = "alice";
+    const createAmount = 1000;
 
-    const inputAlice = this.instance.createEncryptedInput(this.confidentialATCAddress, this.signers.alice.address);
-    inputAlice.add64(amount);
-    const encryptedAllowanceAmount = await inputAlice.encrypt();
+    const registerTx = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount , this.signers.alice.address);
+    await expect(registerTx).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount , this.signers.alice.address);
+    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount , this.signers.alice.address, createAmount, "");
+    await expect(createTx).to.emit(this.confidentialATC, "CreateExecuted").withArgs("operationId", fromAccount , this.signers.alice.address, createAmount, "");
 
-    const tx = await this.confidentialATC
-      .connect(this.signers.alice)
-      [
-        "approve(address,bytes32,bytes)"
-      ](this.signers.bob.address, encryptedAllowanceAmount.handles[0], encryptedAllowanceAmount.inputProof);
-
-    await tx.wait();
-
-    const allowanceHandleAlice = await this.confidentialATC.allowance(this.signers.alice, this.signers.bob);
-
-    const { publicKey: publicKeyCarol, privateKey: privateKeyCarol } = await this.instance.generateKeypair();
-    const eip712Carol = this.instance.createEIP712(publicKeyCarol, this.confidentialATCAddress);
-    const signatureCarol = await this.signers.carol.signTypedData(
-      eip712Carol.domain,
-      { Reencrypt: eip712Carol.types.Reencrypt },
-      eip712Carol.message,
-    );
-
-    await expect(
-      this.instance.reencrypt(
-        allowanceHandleAlice,
-        privateKeyCarol,
-        publicKeyCarol,
-        signatureCarol.replace("0x", ""),
-        this.confidentialATCAddress,
-        this.signers.carol.address,
-      ),
-    ).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
-  });
-
-  it("should not be able to read the balance if not user after initialization", async function () {
-    // Mint is used to initialize the balanceOf(alice)
-    const amount = 10_000;
-    const tx = await this.confidentialATC.connect(this.signers.alice).create(this.signers.alice, amount);
-    await tx.wait();
-
-    const balanceHandleAlice = await this.confidentialATC.balanceOf(this.signers.alice);
-
-    const { publicKey: publicKeyBob, privateKey: privateKeyBob } = await this.instance.generateKeypair();
-    const eip712Bob = this.instance.createEIP712(publicKeyBob, this.confidentialATCAddress);
-    const signatureBob = await this.signers.bob.signTypedData(
-      eip712Bob.domain,
-      { Reencrypt: eip712Bob.types.Reencrypt },
-      eip712Bob.message,
-    );
-
-    await expect(
-      this.instance.reencrypt(
-        balanceHandleAlice,
-        privateKeyBob,
-        publicKeyBob,
-        signatureBob.replace("0x", ""),
-        this.confidentialATCAddress,
-        this.signers.bob.address,
-      ),
-    ).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
+    expect(await reEncryptBalance(this.signers.alice, fromAccount , this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(createAmount);
+    await expect(reEncryptBalance(this.signers.bob, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
   });
 
   it("receiver cannot be null address", async function () {

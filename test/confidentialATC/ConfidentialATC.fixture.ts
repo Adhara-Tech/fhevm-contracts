@@ -25,6 +25,14 @@ export async function reEncryptBalance(
   tokenAddress: string,
 ): Promise<bigint> {
   const balanceHandle = await token.getAvailableBalanceOf(accountId);
-  const balance = await reencryptEuint64(account, instance, balanceHandle, tokenAddress);
-  return balance;
+  return await reencryptEuint64(account, instance, balanceHandle, tokenAddress);
+}
+
+export async function reEncryptUint64(
+  account: Signer,
+  instance: FhevmInstance,
+  tokenAddress: string,
+  euint64Handle: bigint,
+): Promise<bigint> {
+  return await reencryptEuint64(account, instance, euint64Handle, tokenAddress);
 }

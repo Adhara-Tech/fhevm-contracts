@@ -39,7 +39,6 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     string notaryId;
     euint64 amount;
     uint256 expiryTimestamp;
-    string metaData;
     bytes32 holdStatus;
     bytes32 holdType;
   }
@@ -131,12 +130,15 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     string calldata toAccount,
     address toSigner,
     euint64 amount,
-    string calldata metaData,
-    ebool isTransferable
-  ) external override returns (bool) {
+    string calldata metaData
+  ) public override returns (bool) {
 
-    ebool canTransfer = TFHE.and(isTransferable, TFHE.le(amount, _balances[fromAccount]));
+    ebool canTransfer = TFHE.le(amount, _balances[fromAccount]);
     euint64 transferValue = TFHE.select(canTransfer, amount, TFHE.asEuint64(0));
+
+    TFHE.allowThis(transferValue);
+    TFHE.allow(transferValue, fromSigner);
+    TFHE.allow(transferValue, toSigner);
 
     euint64 newFromBalance = TFHE.sub(_balances[fromAccount], transferValue);
     _balances[fromAccount] = newFromBalance;
@@ -148,8 +150,21 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     TFHE.allowThis(newToBalance);
     TFHE.allow(newToBalance, toSigner);
 
-    emit TransferExecuted(operationId, fromAccount, fromSigner, toAccount, toSigner, amount, metaData);
+    emit TransferExecuted(operationId, fromAccount, fromSigner, toAccount, toSigner, transferValue, metaData);
     return true;
+  }
+
+  function transfer(
+    string calldata operationId,
+    string calldata fromAccount,
+    address fromSigner,
+    string calldata toAccount,
+    address toSigner,
+    einput encryptedAmount,
+    bytes calldata inputProof,
+    string calldata metaData
+  ) external override returns (bool) {
+    return transfer(operationId, fromAccount, fromSigner, toAccount, toSigner, TFHE.asEuint64(encryptedAmount, inputProof), metaData);
   }
 
   function createHold(
@@ -160,16 +175,18 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     address toSigner,
     string calldata notaryId,
     euint64 amount,
-    uint256 duration,
-    string calldata metaData
-  ) external override returns (bool) {
+    uint256 duration
+  ) public override returns (bool) {
     requireNonExistingHold(_holds[operationId]);
 
     ebool canHold = TFHE.le(amount, _balances[fromAccount]);
     euint64 holdValue = TFHE.select(canHold, amount, TFHE.asEuint64(0));
 
-    Hold memory newHold = Hold(fromAccount, fromSigner,toAccount, toSigner, notaryId, holdValue, uint256(0), metaData, _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL);
+    Hold memory newHold = Hold(fromAccount, fromSigner,toAccount, toSigner, notaryId, holdValue, uint256(0), _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL);
     requireValidHold(newHold);
+    TFHE.allowThis(holdValue);
+    TFHE.allow(holdValue, fromSigner);
+    TFHE.allow(holdValue, toSigner);
 
     euint64 newFromBalance = TFHE.sub(_balances[fromAccount], holdValue);
     _balances[fromAccount] = newFromBalance;
@@ -178,8 +195,22 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
 
     _holds[operationId] = newHold;
 
-    emit CreateHoldExecuted(operationId, fromAccount, fromSigner, toAccount, toSigner, notaryId, holdValue, metaData);
+    emit CreateHoldExecuted(operationId, fromAccount, fromSigner, toAccount, toSigner, notaryId, holdValue);
     return true;
+  }
+
+  function createHold(
+    string calldata operationId,
+    string calldata fromAccount,
+    address fromSigner,
+    string calldata toAccount,
+    address toSigner,
+    string calldata notaryId,
+    einput encryptedAmount,
+    bytes calldata inputProof,
+    uint256 duration
+  ) external returns (bool) {
+    return createHold(operationId, fromAccount, fromSigner, toAccount, toSigner, notaryId, TFHE.asEuint64(encryptedAmount, inputProof), duration);
   }
 
   function executeHold(
@@ -242,7 +273,6 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     string memory notaryId,
     euint64 amount,
     uint256 expiryTimestamp,
-    string memory metaData,
     bytes32 holdStatus,
     bytes32 holdType
   ) {
@@ -254,7 +284,6 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
       holdToReturn.notaryId,
       holdToReturn.amount,
       holdToReturn.expiryTimestamp,
-      holdToReturn.metaData,
       holdToReturn.holdStatus,
       holdToReturn.holdType);
   }
@@ -300,17 +329,6 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
   ) internal view {
     require(hold.holdStatus == _HOLD_STATUS_NEW
          || hold.holdStatus == _HOLD_STATUS_PERPETUAL, "Hold is not cancellable");
-  }
-
-  function stringToRepresentativeAddress(string memory str) public pure returns (address addr) {
-    bytes memory strBytes = bytes(str);
-    // Copy first 20 bytes
-    bytes20 truncated;
-    assembly {
-      truncated := mload(add(strBytes, 32)) // skip length prefix
-    }
-
-    return address(truncated);
   }
 }
 

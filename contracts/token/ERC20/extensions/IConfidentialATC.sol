@@ -46,7 +46,6 @@ interface IConfidentialATC {
 	 * @param notaryId The notary id.
 	 * @param amount The encrypted amount of tokens.
 	 * @param duration The timeout period (seconds).
-	 * @param metaData Any public meta data / instructions accompanying the operation.
 	 * @return Returns true upon success.
 	 * @dev If successful, emits CreateHoldExecuted(string operationId, string fromAccount, string toAccount, string notaryId, uint256 amount, string metaData)
 	 */
@@ -58,8 +57,7 @@ interface IConfidentialATC {
 		address toSigner,
 		string calldata notaryId,
 		euint64 amount,
-		uint256 duration,
-		string calldata metaData
+		uint256 duration
 	) external returns (bool);
 
 	/* Event emitted after a hold was successfully created. */
@@ -70,9 +68,20 @@ interface IConfidentialATC {
 		string toAccount,
 		address toSigner,
 		string notaryId,
-		euint64 amount,
-		string metaData
+		euint64 amount
 	);
+
+	function createHold(
+		string calldata operationId,
+		string calldata fromAccount,
+		address fromSigner,
+		string calldata toAccount,
+		address toSigner,
+		string calldata notaryId,
+		einput encryptedAmount,
+		bytes calldata inputProof,
+		uint256 duration
+	) external returns (bool);
 
 	/*
 	 * @notice Cancel an existing hold. The hold fromAccount can cancel the hold after it has expired (i.e. after duration seconds),
@@ -143,7 +152,6 @@ interface IConfidentialATC {
 		string memory notaryId,
 		euint64 amount,
 		uint256 expiryTimestamp,
-		string memory metaData,
 		bytes32 holdStatus,
 		bytes32 holdType
 	);
@@ -249,9 +257,9 @@ interface IConfidentialATC {
 		string calldata toAccount,
 		address toSigner,
 		euint64 amount,
-		string calldata metaData,
-		ebool isTransferable
+		string calldata metaData
 	) external returns (bool);
+
 
 	/* @notice Event emitted after tokens were destroyed. */
 	event TransferExecuted(
@@ -263,4 +271,15 @@ interface IConfidentialATC {
 		euint64 amount,
 		string metaData
 	);
+
+	function transfer(
+		string calldata operationId,
+		string calldata fromAccount,
+		address fromSigner,
+		string calldata toAccount,
+		address toSigner,
+		einput encryptedAmount,
+		bytes calldata inputProof,
+		string calldata metaData
+	) external returns (bool);
 }
