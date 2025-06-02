@@ -67,6 +67,54 @@ abstract contract ConfidentialATCWrapped is
 		}
 	}
 
+	function transfer(
+		string calldata operationId,
+		string calldata fromAccount,
+		address fromAddress,
+		string calldata toAccount,
+		address toAddress,
+		einput encryptedAmount,
+		bytes calldata inputProof,
+		string calldata metaData
+	) public override returns (bool) {
+		requireNotRestricted(fromAccount);
+		return super.transfer(
+			operationId,
+			fromAccount,
+			fromAddress,
+			toAccount,
+			toAddress,
+			encryptedAmount,
+			inputProof,
+			metaData
+		);
+	}
+
+	function createHold(
+		string calldata operationId,
+		string calldata fromAccount,
+		address fromAddress,
+		string calldata toAccount,
+		address toAddress,
+		string calldata notaryId,
+		einput encryptedAmount,
+		bytes calldata inputProof,
+		uint256 duration
+	) public override returns (bool) {
+		requireNotRestricted(fromAccount);
+		return super.createHold(
+			operationId,
+			fromAccount,
+			fromAddress,
+			toAccount,
+			toAddress,
+			notaryId,
+			encryptedAmount,
+			inputProof,
+			duration
+		);
+	}
+
 	/**
 	 * @notice         Unwrap ConfidentialATC tokens to standard ATC tokens.
    * @param amount   Amount to unwrap.
@@ -97,6 +145,7 @@ abstract contract ConfidentialATCWrapped is
    * @param amount   Amount to wrap.
    */
 	function wrap(string memory operationId, string memory fromAccount, address fromAddress, uint256 amount) public virtual {
+		// TODO: This should execute a hold rather, so that wrapper contract can be made a hold notary operator
 		try ATC_TOKEN.transfer(operationId, fromAccount, wrapperAccount, amount, "wrap") {
   		uint256 amountAdjusted = amount / (10 ** (ATC_TOKEN.decimals() - _decimals));
 		  if (amountAdjusted > type(uint64).max) {
@@ -121,6 +170,7 @@ abstract contract ConfidentialATCWrapped is
 
 		if (canUnwrap) {
 			uint256 amountUint256 = unwrapRequest.amount * (10 ** (ATC_TOKEN.decimals() - _decimals));
+			// This wrapper contract should have permissions to transfer from the wrapper account
 			try ATC_TOKEN.transfer(requestId.toString(), wrapperAccount, unwrapRequest.accountId, amountUint256, "unwrap") {
 				uint64 amountUint64 = uint64(amountUint256);
 				unsafeDestroy(requestId.toString(), unwrapRequest.accountId, unwrapRequest.accountAddress, amountUint64);

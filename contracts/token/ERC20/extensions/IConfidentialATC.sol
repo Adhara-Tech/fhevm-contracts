@@ -56,11 +56,12 @@ interface IConfidentialATC {
 		string calldata toAccount,
 		address toAddress,
 		string calldata notaryId,
-		euint64 amount,
+		einput encryptedAmount,
+		bytes calldata inputProof,
 		uint256 duration
 	) external returns (bool);
 
-	/* Event emitted after a hold was successfully created. */
+	/* @notice Event emitted after tokens were destroyed. */
 	event CreateHoldExecuted(
 		string operationId,
 		string fromAccount,
@@ -70,18 +71,6 @@ interface IConfidentialATC {
 		string notaryId,
 		euint64 amount
 	);
-
-	function createHold(
-		string calldata operationId,
-		string calldata fromAccount,
-		address fromAddress,
-		string calldata toAccount,
-		address toAddress,
-		string calldata notaryId,
-		einput encryptedAmount,
-		bytes calldata inputProof,
-		uint256 duration
-	) external returns (bool);
 
 	/*
 	 * @notice Cancel an existing hold. The hold fromAccount can cancel the hold after it has expired (i.e. after duration seconds),
@@ -205,8 +194,8 @@ interface IConfidentialATC {
 	) external;
 
 	/**
-	  * @notice Event emitted after tokens were created.
-	  */
+	 * @notice Event emitted after tokens were created.
+	 */
 	event CreateExecuted(
 		string operationId,
 		string toAccount,
@@ -227,10 +216,10 @@ interface IConfidentialATC {
 		string calldata operationId,
 		string calldata fromAccount,
 		address fromAddress,
-		euint64 amount,
+		einput encryptedAmount,
+		bytes calldata inputProof,
 		string calldata metaData
 	) external;
-
 
 	/* @notice Event emitted after tokens were destroyed. */
 	event DestroyExecuted(
@@ -241,15 +230,6 @@ interface IConfidentialATC {
 		string metaData
 	);
 
-	function destroy(
-		string calldata operationId,
-		string calldata fromAccount,
-		address fromAddress,
-		einput encryptedAmount,
-		bytes calldata inputProof,
-		string calldata metaData
-	) external;
-
 	/*
 	 * @notice Transfer tokens from one account to another.
 	 * @param operationId The id of the operation.
@@ -259,16 +239,16 @@ interface IConfidentialATC {
 	 * @param metaData Any public meta data / instructions accompanying the operation.
 	 * @return Returns a boolean indicating successful execution of the function.
 	 */
-	function transfer(
+  function transfer(
 		string calldata operationId,
 		string calldata fromAccount,
 		address fromAddress,
 		string calldata toAccount,
 		address toAddress,
-		euint64 amount,
+		einput encryptedAmount,
+		bytes calldata inputProof,
 		string calldata metaData
 	) external returns (bool);
-
 
 	/* @notice Event emitted after tokens were destroyed. */
 	event TransferExecuted(
@@ -281,14 +261,5 @@ interface IConfidentialATC {
 		string metaData
 	);
 
-	function transfer(
-		string calldata operationId,
-		string calldata fromAccount,
-		address fromAddress,
-		string calldata toAccount,
-		address toAddress,
-		einput encryptedAmount,
-		bytes calldata inputProof,
-		string calldata metaData
-	) external returns (bool);
+
 }

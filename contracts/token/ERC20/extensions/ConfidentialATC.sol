@@ -107,7 +107,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     address fromAddress,
     euint64 amount,
     string calldata metaData
-  ) public virtual onlyOwner {
+  ) internal onlyOwner {
 
     ebool canDestroy = TFHE.le(amount, _balances[fromAccount]);
     euint64 destroyValue = TFHE.select(canDestroy, amount, TFHE.asEuint64(0));
@@ -139,7 +139,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     address toAddress,
     euint64 amount,
     string calldata metaData
-  ) public override returns (bool) {
+  ) internal returns (bool) {
 
     ebool canTransfer = TFHE.le(amount, _balances[fromAccount]);
     euint64 transferValue = TFHE.select(canTransfer, amount, TFHE.asEuint64(0));
@@ -171,7 +171,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     einput encryptedAmount,
     bytes calldata inputProof,
     string calldata metaData
-  ) external override returns (bool) {
+  ) public virtual returns (bool) {
     return transfer(operationId, fromAccount, fromAddress, toAccount, toAddress, TFHE.asEuint64(encryptedAmount, inputProof), metaData);
   }
 
@@ -184,7 +184,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     string calldata notaryId,
     euint64 amount,
     uint256 duration
-  ) public override returns (bool) {
+  ) internal returns (bool) {
     requireNonExistingHold(_holds[operationId]);
 
     ebool canHold = TFHE.le(amount, _balances[fromAccount]);
@@ -217,13 +217,13 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     einput encryptedAmount,
     bytes calldata inputProof,
     uint256 duration
-  ) external returns (bool) {
+  ) public virtual returns (bool) {
     return createHold(operationId, fromAccount, fromAddress, toAccount, toAddress, notaryId, TFHE.asEuint64(encryptedAmount, inputProof), duration);
   }
 
   function executeHold(
     string calldata operationId
-  ) external override returns (bool) {
+  ) public virtual returns (bool) {
     Hold memory holdToExecute = _holds[operationId];
     requireExistingHold(holdToExecute);
     requireExecutableHold(holdToExecute);
@@ -241,7 +241,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
 
   function cancelHold(
     string calldata operationId
-  ) external override returns (bool) {
+  ) public virtual returns (bool) {
     Hold memory holdToCancel = _holds[operationId];
     requireExistingHold(holdToCancel);
     requireCancellableHold(holdToCancel);
@@ -260,20 +260,19 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
   function addHoldNotary(
     string calldata notaryId,
     address holdNotaryAdminAddress
-  ) external override returns (bool) {
+  ) public virtual returns (bool) {
     _notaries[notaryId] = holdNotaryAdminAddress;
     return true;
   }
 
   function isHoldNotary(
     string calldata notaryId
-  ) external override view returns (bool) {
+  ) public virtual view returns (bool) {
     return _notaries[notaryId] != address(0);
   }
 
   function getHoldData(string calldata operationId)
-  external override view virtual
-  returns (
+  public virtual view returns (
     string memory fromAccount,
     address fromAddress,
     string memory toAccount,
@@ -298,7 +297,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
 
   function makeHoldPerpetual(
     string calldata operationId
-  ) external override returns (bool) {
+  ) public virtual returns (bool) {
     Hold memory holdToChange = _holds[operationId];
     requireExistingHold(holdToChange);
     holdToChange.holdStatus = _HOLD_STATUS_PERPETUAL;

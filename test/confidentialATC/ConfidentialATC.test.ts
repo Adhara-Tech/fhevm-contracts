@@ -4,7 +4,7 @@ import { createInstance } from "../instance";
 import { getSigners, initSigners } from "../signers";
 import { deployConfidentialATCFixture, reEncryptBalance, reEncryptUint64 } from "./ConfidentialATC.fixture";
 
-describe.only("ConfidentialATC", function () {
+describe("ConfidentialATC", function () {
   // @dev The placeholder is type(uint256).max --> 2**256 - 1.
   const PLACEHOLDER = 2n ** 256n - 1n;
 
@@ -32,7 +32,7 @@ describe.only("ConfidentialATC", function () {
     expect(await this.confidentialATC.decimals()).to.be.eq(BigInt(6));
   });
 
-  it.only("should create tokens in the contract", async function () {
+  it("should create tokens in the contract", async function () {
     const fromAccount = "alice";
     const createAmount = 1000;
 
@@ -47,7 +47,7 @@ describe.only("ConfidentialATC", function () {
     ).to.equal(createAmount);
   });
 
-  it.only("should transfer tokens between two users", async function () {
+  it("should transfer tokens between two users", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 2000;
@@ -98,7 +98,7 @@ describe.only("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(transferAmount);
   });
 
-  it.only("should not transfer tokens between two users if transfer amount is higher than balance", async function () {
+  it("should not transfer tokens between two users if transfer amount is higher than balance", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 1000;
@@ -134,7 +134,7 @@ describe.only("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
   });
 
-  it.only("should create hold and execute correctly if balance is sufficient", async function () {
+  it("should create hold and execute correctly if balance is sufficient", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 2000;
@@ -192,7 +192,7 @@ describe.only("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(holdAmount);
   });
 
-  it.only("should create hold and execute correctly with zero amount if balance is sufficient", async function () {
+  it("should create hold and execute correctly with zero amount if balance is sufficient", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 1000;
@@ -247,7 +247,7 @@ describe.only("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
   });
 
-  it.only("should not be able to read the balance if not user after initialization", async function () {
+  it("should not be able to read the balance if not user after initialization", async function () {
     const fromAccount = "alice";
     const createAmount = 1000;
 
@@ -260,7 +260,7 @@ describe.only("ConfidentialATC", function () {
     await expect(reEncryptBalance(this.signers.bob, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
   });
 
-  it.only("sender or receiver cannot be null address", async function () {
+  it("sender or receiver cannot be null address", async function () {
     const NULL_ADDRESS = "0x0000000000000000000000000000000000000000";
     const fromAccount = "alice";
     const toAccount = "bob";
@@ -306,7 +306,7 @@ describe.only("ConfidentialATC", function () {
     )).to.be.revertedWith("Invalid receiving account address in hold data");
   });
 
-  it.only("sender cannot create hold using a handle from another account", async function () {
+  it("sender cannot create hold using a handle from another account", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 100000;
@@ -338,7 +338,7 @@ describe.only("ConfidentialATC", function () {
 
   });
 
-  it.only("only owner can create", async function () {
+  it("only owner can create", async function () {
     const fromAccount = "alice";
     const createAmount = 1000;
 
