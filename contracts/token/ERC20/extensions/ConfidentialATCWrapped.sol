@@ -71,7 +71,7 @@ abstract contract ConfidentialATCWrapped is
 	 * @notice         Unwrap ConfidentialATC tokens to standard ATC tokens.
    * @param amount   Amount to unwrap.
    */
-	function unwrap(string memory operationId, string memory fromAccount, uint64 amount) public virtual {
+	function unwrap(string memory operationId, string memory fromAccount, address fromAddress, uint64 amount) public virtual {
 		requireNotRestricted(fromAccount);
 
 		/// @dev Once this function is called, it becomes impossible for the sender to move any token.
@@ -89,25 +89,25 @@ abstract contract ConfidentialATCWrapped is
 			false
 		);
 
-		unwrapRequests[requestId] = UnwrapRequest({accountId: fromAccount, amount: amount});
+		unwrapRequests[requestId] = UnwrapRequest({accountId: fromAccount, accountAddress: fromAddress, amount: amount});
 	}
 
 	/**
 	 * @notice         Wrap ATC tokens to an encrypted format.
    * @param amount   Amount to wrap.
    */
-	function wrap(string memory operationId, string memory fromAccount, uint256 amount) public virtual {
+	function wrap(string memory operationId, string memory fromAccount, address fromAddress, uint256 amount) public virtual {
 		try ATC_TOKEN.transfer(operationId, fromAccount, wrapperAccount, amount, "wrap") {
   		uint256 amountAdjusted = amount / (10 ** (ATC_TOKEN.decimals() - _decimals));
 		  if (amountAdjusted > type(uint64).max) {
 			  revert AmountTooHigh();
 		  }
 		  uint64 amountUint64 = uint64(amountAdjusted);
-		  unsafeCreate(operationId, fromAccount, amountUint64);
+		  unsafeCreate(operationId, fromAccount, fromAddress, amountUint64);
 		  _totalSupply += amountUint64;
-		  emit Wrap(fromAccount, amountUint64);
+		  emit Wrap(fromAccount, fromAddress, amountUint64);
 		} catch {
-		 emit WrapFailTransferFail(fromAccount, uint64(amount));
+		 emit WrapFailTransferFail(fromAccount, fromAddress, uint64(amount));
 	  }
 	}
 
@@ -123,14 +123,14 @@ abstract contract ConfidentialATCWrapped is
 			uint256 amountUint256 = unwrapRequest.amount * (10 ** (ATC_TOKEN.decimals() - _decimals));
 			try ATC_TOKEN.transfer(requestId.toString(), wrapperAccount, unwrapRequest.accountId, amountUint256, "unwrap") {
 				uint64 amountUint64 = uint64(amountUint256);
-				unsafeDestroy(requestId.toString(), unwrapRequest.accountId, amountUint64);
+				unsafeDestroy(requestId.toString(), unwrapRequest.accountId, unwrapRequest.accountAddress, amountUint64);
 				_totalSupply -= unwrapRequest.amount;
-				emit Unwrap(unwrapRequest.accountId, unwrapRequest.amount);
+				emit Unwrap(unwrapRequest.accountId, unwrapRequest.accountAddress, unwrapRequest.amount);
 			} catch {
-				emit UnwrapFailTransferFail(unwrapRequest.accountId, unwrapRequest.amount);
+				emit UnwrapFailTransferFail(unwrapRequest.accountId, unwrapRequest.accountAddress,unwrapRequest.amount);
 			}
 		} else {
-			emit UnwrapFailNotEnoughBalance(unwrapRequest.accountId, unwrapRequest.amount);
+			emit UnwrapFailNotEnoughBalance(unwrapRequest.accountId, unwrapRequest.accountAddress, unwrapRequest.amount);
 		}
 		delete unwrapRequests[requestId];
 		delete isAccountRestricted[unwrapRequest.accountId];
@@ -145,19 +145,25 @@ abstract contract ConfidentialATCWrapped is
 	function unsafeCreate(
 		string memory operationId,
 		string memory toAccount,
+		address toAddress,
 		uint64 amount
 	) internal {
 		euint64 newToBalance = TFHE.add(_balances[toAccount], amount);
 		_balances[toAccount] = newToBalance;
+		TFHE.allowThis(newToBalance);
+		TFHE.allow(newToBalance, toAddress);
 	}
 
 	function unsafeDestroy(
 		string memory operationId,
 		string memory fromAccount,
+		address fromAddress,
 		uint64 amount
 	) internal {
 		euint64 newFromBalance = TFHE.sub(_balances[fromAccount], amount);
 		_balances[fromAccount] = newFromBalance;
+		TFHE.allowThis(newFromBalance);
+		TFHE.allow(newFromBalance, fromAddress);
 	}
 
 }

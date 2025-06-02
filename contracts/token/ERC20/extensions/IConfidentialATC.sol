@@ -52,9 +52,9 @@ interface IConfidentialATC {
 	function createHold(
 		string calldata operationId,
 		string calldata fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string calldata toAccount,
-		address toSigner,
+		address toAddress,
 		string calldata notaryId,
 		euint64 amount,
 		uint256 duration
@@ -64,9 +64,9 @@ interface IConfidentialATC {
 	event CreateHoldExecuted(
 		string operationId,
 		string fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string toAccount,
-		address toSigner,
+		address toAddress,
 		string notaryId,
 		euint64 amount
 	);
@@ -74,9 +74,9 @@ interface IConfidentialATC {
 	function createHold(
 		string calldata operationId,
 		string calldata fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string calldata toAccount,
-		address toSigner,
+		address toAddress,
 		string calldata notaryId,
 		einput encryptedAmount,
 		bytes calldata inputProof,
@@ -146,9 +146,9 @@ interface IConfidentialATC {
 		string calldata operationId
 	) external view returns (
 		string memory fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string memory toAccount,
-		address toSigner,
+		address toAddress,
 		string memory notaryId,
 		euint64 amount,
 		uint256 expiryTimestamp,
@@ -184,9 +184,9 @@ interface IConfidentialATC {
 	) external view returns (bool);
 
 
-	function registerAccount(string calldata account, address signer) external;
+	function registerAccount(string calldata account, address accountAddress) external;
 
-	event RegisterAccountExecuted(string account, address signer);
+	event RegisterAccountExecuted(string account, address accountAddress);
 
 	/*
 	 * @notice Create tokens into the specified account.
@@ -199,7 +199,7 @@ interface IConfidentialATC {
 	function create(
 		string calldata operationId,
 		string calldata toAccount,
-		address toSigner,
+		address toAddress,
 		uint64 amount,
 		string calldata metaData
 	) external;
@@ -210,7 +210,7 @@ interface IConfidentialATC {
 	event CreateExecuted(
 		string operationId,
 		string toAccount,
-		address toSigner,
+		address toAddress,
 		uint64 amount,
 		string metaData
 	);
@@ -226,7 +226,7 @@ interface IConfidentialATC {
 	function destroy(
 		string calldata operationId,
 		string calldata fromAccount,
-		address fromSigner,
+		address fromAddress,
 		euint64 amount,
 		string calldata metaData
 	) external;
@@ -236,10 +236,19 @@ interface IConfidentialATC {
 	event DestroyExecuted(
 		string operationId,
 		string fromAccount,
-		address fromSigner,
+		address fromAddress,
 		euint64 amount,
 		string metaData
 	);
+
+	function destroy(
+		string calldata operationId,
+		string calldata fromAccount,
+		address fromAddress,
+		einput encryptedAmount,
+		bytes calldata inputProof,
+		string calldata metaData
+	) external;
 
 	/*
 	 * @notice Transfer tokens from one account to another.
@@ -253,9 +262,9 @@ interface IConfidentialATC {
 	function transfer(
 		string calldata operationId,
 		string calldata fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string calldata toAccount,
-		address toSigner,
+		address toAddress,
 		euint64 amount,
 		string calldata metaData
 	) external returns (bool);
@@ -265,9 +274,9 @@ interface IConfidentialATC {
 	event TransferExecuted(
 		string operationId,
 		string fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string toAccount,
-		address toSigner,
+		address toAddress,
 		euint64 amount,
 		string metaData
 	);
@@ -275,9 +284,9 @@ interface IConfidentialATC {
 	function transfer(
 		string calldata operationId,
 		string calldata fromAccount,
-		address fromSigner,
+		address fromAddress,
 		string calldata toAccount,
-		address toSigner,
+		address toAddress,
 		einput encryptedAmount,
 		bytes calldata inputProof,
 		string calldata metaData

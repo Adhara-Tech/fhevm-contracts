@@ -33,6 +33,10 @@ interface IATC {
 		string calldata account
 	) external view returns (uint256);
 
+	function registerAccount(string calldata account, address accountAddress) external;
+
+	event RegisterAccountExecuted(string account, address accountAddress);
+
 	/*
    * @notice Create tokens into the specified account.
    * @param operationId The id of the operation.
@@ -126,8 +130,7 @@ interface IATC {
 		string calldata toAccount,
 		string calldata notaryId,
 		uint256 amount,
-		uint256 duration,
-		string calldata metaData
+		uint256 duration
 	) external returns (bool);
 
 	/* @notice Event emitted after a hold was successfully created. */
@@ -136,8 +139,7 @@ interface IATC {
 		string fromAccount,
 		string toAccount,
 		string notaryId,
-		uint256 amount,
-		string metaData
+		uint256 amount
 	);
 
 	/*
@@ -207,10 +209,8 @@ interface IATC {
 		string memory notaryId,
 		uint256 amount,
 		uint256 expiryTimestamp,
-		string memory metaData,
 		bytes32 holdStatus,
-		bytes32 holdType,
-		bytes32 signer
+		bytes32 holdType
 	);
 
 	/*

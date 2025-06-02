@@ -1,44 +1,41 @@
 import { Signer } from "ethers";
 import { ethers } from "hardhat";
 
-import type { ConfidentialERC20Wrapped, ERC20Mintable, TestConfidentialERC20Wrapped } from "../../types";
+import type { ConfidentialATCWrapped, ATC, TestConfidentialATCWrapped } from "../../types";
 
 export async function deployATCAndConfidentialATCWrappedFixture(
   account: Signer,
   name: string,
   symbol: string,
-  decimals: number,
-): Promise<[ERC20Mintable, TestConfidentialERC20Wrapped]> {
+): Promise<[ATC, TestConfidentialATCWrapped]> {
   // @dev We use 5 minutes for the maximum decryption delay (from the Gateway).
   const maxDecryptionDelay = 60 * 5;
-  const contractFactoryERC20Mintable = await ethers.getContractFactory("ERC20Mintable");
-  const contractERC20 = await contractFactoryERC20Mintable
+  const contractFactoryATC = await ethers.getContractFactory("TestATC");
+  const contractATC = await contractFactoryATC
     .connect(account)
-    .deploy(name, symbol, decimals, await account.getAddress());
-  await contractERC20.waitForDeployment();
+    .deploy(name, symbol, await account.getAddress());
+  await contractATC.waitForDeployment();
 
-  const contractFactory = await ethers.getContractFactory("TestConfidentialERC20Wrapped");
-  const contractConfidentialERC20Wrapped = await contractFactory
+  const contractFactory = await ethers.getContractFactory("TestConfidentialATCWrapped");
+  const contractConfidentialATCWrapped = await contractFactory
     .connect(account)
-    .deploy(contractERC20.getAddress(), maxDecryptionDelay);
-  await contractConfidentialERC20Wrapped.waitForDeployment();
+    .deploy(contractATC.getAddress(), maxDecryptionDelay);
+  await contractConfidentialATCWrapped.waitForDeployment();
 
-  return [contractERC20, contractConfidentialERC20Wrapped];
+  return [contractATC, contractConfidentialATCWrapped];
 }
 
 export async function mintAndWrap(
   account: Signer,
-  plainToken: ERC20Mintable,
-  token: ConfidentialERC20Wrapped,
+  accountId: string,
+  plainToken: ATC,
+  token: ConfidentialATCWrapped,
   tokenAddress: string,
   amount: bigint,
 ): Promise<void> {
-  let tx = await plainToken.connect(account).mint(amount);
+  let tx = await plainToken.connect(account).create("operationId", accountId, amount, "");
   await tx.wait();
 
-  // tx = await plainToken.connect(account).approve(tokenAddress, amount);
-  // await tx.wait();
-
-  tx = await token.connect(account).wrap(amount);
+  tx = await token.connect(account).wrap("operationId", accountId, amount);
   await tx.wait();
 }

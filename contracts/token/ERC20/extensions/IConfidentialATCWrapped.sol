@@ -22,35 +22,35 @@ interface IConfidentialATCWrapped {
      * @param accountId Account identifier of the account that unwraps tokens.
      * @param amount    Amount to unwrap.
      */
-    event Unwrap(string indexed accountId, uint64 amount);
+    event Unwrap(string indexed accountId, address accountAddress, uint64 amount);
 
     /**
      * @notice          Emitted if unwrap fails due to lack of funds.
      * @param accountId Account identifier of the account that tried to unwrap.
      * @param amount    Amount to unwrap.
      */
-    event UnwrapFailNotEnoughBalance(string accountId, uint64 amount);
+    event UnwrapFailNotEnoughBalance(string indexed accountId, address accountAddress, uint64 amount);
 
     /**
      * @notice         Emitted if unwrap fails due to failed transfer.
      * @param accountId Account identifier of the account that tried to unwrap.
      * @param amount   Amount to unwrap.
      */
-    event UnwrapFailTransferFail(string accountId, uint64 amount);
+    event UnwrapFailTransferFail(string indexed accountId, address accountAddress, uint64 amount);
 
     /**
      * @notice         Emitted when token is wrapped.
      * @param accountId Account identifier of the account that wraps tokens.
      * @param amount   Amount to wrap.
      */
-    event Wrap(string indexed accountId, uint64 amount);
+    event Wrap(string indexed accountId, address accountAddress, uint64 amount);
 
     /**
      * @notice          Emitted if wrap fails due to failed transfer.
      * @param accountId Account identifier of the account that tried to wrap.
      * @param amount    Amount to wrap.
      */
-    event WrapFailTransferFail(string accountId, uint64 amount);
+    event WrapFailTransferFail(string indexed accountId, address accountAddress, uint64 amount);
 
     /**
      * @notice          This struct keeps track of the unwrap request information.
@@ -58,7 +58,8 @@ interface IConfidentialATCWrapped {
      * @param amount    Amount to be unwrapped.
      */
     struct UnwrapRequest {
-        string accountId;
-        uint64 amount;
+      string accountId;
+      address accountAddress;
+      uint64 amount;
     }
 }
