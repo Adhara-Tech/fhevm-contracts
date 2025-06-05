@@ -50,14 +50,14 @@ interface IConfidentialATC {
 	 * @dev If successful, emits CreateHoldExecuted(string operationId, string fromAccount, string toAccount, string notaryId, uint256 amount, string metaData)
 	 */
 	function createHold(
-		string calldata operationId,
-		string calldata fromAccount,
+		string memory operationId,
+		string memory fromAccount,
 		address fromAddress,
-		string calldata toAccount,
+		string memory toAccount,
 		address toAddress,
-		string calldata notaryId,
+		string memory notaryId,
 		einput encryptedAmount,
-		bytes calldata inputProof,
+		bytes memory inputProof,
 		uint256 duration
 	) external returns (bool);
 
@@ -240,14 +240,13 @@ interface IConfidentialATC {
 	 * @return Returns a boolean indicating successful execution of the function.
 	 */
   function transfer(
-		string calldata operationId,
-		string calldata fromAccount,
+		string memory operationId,
+		string memory fromAccount,
 		address fromAddress,
-		string calldata toAccount,
+		string memory toAccount,
 		address toAddress,
 		einput encryptedAmount,
-		bytes calldata inputProof,
-		string calldata metaData
+		bytes memory inputProof
 	) external returns (bool);
 
 	/* @notice Event emitted after tokens were destroyed. */
@@ -257,8 +256,7 @@ interface IConfidentialATC {
 		address fromAddress,
 		string toAccount,
 		address toAddress,
-		euint64 amount,
-		string metaData
+		euint64 amount
 	);
 
 

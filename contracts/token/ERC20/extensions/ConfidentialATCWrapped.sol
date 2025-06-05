@@ -68,14 +68,13 @@ abstract contract ConfidentialATCWrapped is
 	}
 
 	function transfer(
-		string calldata operationId,
-		string calldata fromAccount,
+		string memory operationId,
+		string memory fromAccount,
 		address fromAddress,
-		string calldata toAccount,
+		string memory toAccount,
 		address toAddress,
 		einput encryptedAmount,
-		bytes calldata inputProof,
-		string calldata metaData
+		bytes memory inputProof
 	) public override returns (bool) {
 		requireNotRestricted(fromAccount);
 		return super.transfer(
@@ -85,20 +84,19 @@ abstract contract ConfidentialATCWrapped is
 			toAccount,
 			toAddress,
 			encryptedAmount,
-			inputProof,
-			metaData
+			inputProof
 		);
 	}
 
 	function createHold(
-		string calldata operationId,
-		string calldata fromAccount,
+		string memory operationId,
+		string memory fromAccount,
 		address fromAddress,
-		string calldata toAccount,
+		string memory toAccount,
 		address toAddress,
-		string calldata notaryId,
+		string memory notaryId,
 		einput encryptedAmount,
-		bytes calldata inputProof,
+		bytes memory inputProof,
 		uint256 duration
 	) public override returns (bool) {
 		requireNotRestricted(fromAccount);

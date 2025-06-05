@@ -9,7 +9,7 @@ import { resolve } from "path";
 import "solidity-docgen";
 
 import CustomProvider from "./CustomProvider";
-import { setCodeMocked } from "./test/mockedSetup";
+import { setCodeMocked, setCodeMocked2 } from "./test/mockedSetup";
 
 extendProvider(async (provider) => {
   const newProvider = new CustomProvider(provider);
@@ -33,7 +33,7 @@ const mnemonic: string = process.env.MNEMONIC || "test test test test test test 
 
 const chainIds = {
   zama: 8009,
-  local: 9000,
+  local: 44845,
   localCoprocessor: 12345,
   sepolia: 11155111,
 };
@@ -77,6 +77,9 @@ task("test", async (_taskArgs, hre, runSuper) => {
   if (hre.network.name === "hardhat") {
     await setCodeMocked(hre);
   }
+  if (hre.network.name === "besu") {
+    await setCodeMocked2(hre);
+  }
   await runSuper();
 });
 
@@ -112,6 +115,14 @@ const config: HardhatUserConfig = {
     // localDev: getChainConfig("local"),
     // local: getChainConfig("local"),
     // localCoprocessor: getChainConfig("localCoprocessor"),
+    besu: {
+      url: "http://localhost:8545",
+      accounts: [
+        "0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63",
+        "0xc87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3",
+        "0xae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f",
+      ],
+    },
   },
   paths: {
     artifacts: "./artifacts",
@@ -131,10 +142,13 @@ const config: HardhatUserConfig = {
       // https://hardhat.org/hardhat-network/#solidity-optimizer-support
       optimizer: {
         enabled: true,
-        runs: 800,
+        runs: 1000,
+        details: {
+          yul: true,
+        },
       },
       evmVersion: "cancun",
-      viaIR: true
+      viaIR: false
     },
   },
   warnings: {

@@ -1,0 +1,34 @@
+networks:
+  test_setup_default:
+    name: test_setup_default
+  postgres_default:
+    name: postgres_default
+services:
+  besu-qbft:
+    profiles: [ "provision" ]
+    networks:
+      - test_setup_default
+    image: hyperledger/besu:25.6.0
+    container_name: besu-qbft
+    command:
+      - --config-file
+      - /etc/besu/besu.conf
+      - --genesis-file
+      - /etc/besu/genesis.json
+      - --data-path
+      - /var/lib/besu/data
+      - --rpc-http-host
+      - 0.0.0.0
+      - --rpc-ws-host
+      - 0.0.0.0
+      - --metrics-host
+      - 0.0.0.0
+      - --p2p-host
+      - 0.0.0.0
+    volumes:
+      - "./besu/qbft/config/besu.conf:/etc/besu/besu.conf"
+      - "./besu/qbft/nodes/node_1:/var/lib/besu/data"
+      - "./besu/qbft/genesis/node_1.json:/etc/besu/genesis.json"
+    ports:
+      - "8545:8545"
+      - "10545:9545"

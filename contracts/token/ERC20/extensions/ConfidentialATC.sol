@@ -40,6 +40,15 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     bytes32 holdType;
   }
 
+  struct Operation {
+    string operationId;
+    string fromAccount;
+    address fromAddress;
+    string toAccount;
+    address toAddress;
+    euint64 amount;
+  }
+
   string internal _name;
   string internal _symbol;
   uint8 internal _decimals;
@@ -132,93 +141,98 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
   }
 
   function transfer(
-    string calldata operationId,
-    string calldata fromAccount,
-    address fromAddress,
-    string calldata toAccount,
-    address toAddress,
-    euint64 amount,
-    string calldata metaData
+    Operation memory operation
   ) internal returns (bool) {
 
-    ebool canTransfer = TFHE.le(amount, _balances[fromAccount]);
-    euint64 transferValue = TFHE.select(canTransfer, amount, TFHE.asEuint64(0));
+    ebool canTransfer = TFHE.le(operation.amount, _balances[operation.fromAccount]);
+    euint64 transferValue = TFHE.select(canTransfer, operation.amount, TFHE.asEuint64(0));
 
     TFHE.allowThis(transferValue);
-    TFHE.allow(transferValue, fromAddress);
-    TFHE.allow(transferValue, toAddress);
+    TFHE.allow(transferValue, operation.fromAddress);
+    TFHE.allow(transferValue, operation.toAddress);
 
-    euint64 newFromBalance = TFHE.sub(_balances[fromAccount], transferValue);
-    _balances[fromAccount] = newFromBalance;
+    euint64 newFromBalance = TFHE.sub(_balances[operation.fromAccount], transferValue);
+    _balances[operation.fromAccount] = newFromBalance;
     TFHE.allowThis(newFromBalance);
-    TFHE.allow(newFromBalance, fromAddress);
+    TFHE.allow(newFromBalance, operation.fromAddress);
 
-    euint64 newToBalance = TFHE.add(_balances[toAccount], transferValue);
-    _balances[toAccount] = newToBalance;
+    euint64 newToBalance = TFHE.add(_balances[operation.toAccount], transferValue);
+    _balances[operation.toAccount] = newToBalance;
     TFHE.allowThis(newToBalance);
-    TFHE.allow(newToBalance, toAddress);
+    TFHE.allow(newToBalance, operation.toAddress);
 
-    emit TransferExecuted(operationId, fromAccount, fromAddress, toAccount, toAddress, transferValue, metaData);
+    emit TransferExecuted(operation.operationId, operation.fromAccount, operation.fromAddress, operation.toAccount, operation.toAddress, transferValue);
     return true;
   }
 
   function transfer(
-    string calldata operationId,
-    string calldata fromAccount,
+    string memory operationId,
+    string memory fromAccount,
     address fromAddress,
-    string calldata toAccount,
+    string memory toAccount,
     address toAddress,
     einput encryptedAmount,
-    bytes calldata inputProof,
-    string calldata metaData
+    bytes memory inputProof
   ) public virtual returns (bool) {
-    return transfer(operationId, fromAccount, fromAddress, toAccount, toAddress, TFHE.asEuint64(encryptedAmount, inputProof), metaData);
+    Operation memory operation = Operation(
+      operationId,
+      fromAccount,
+      fromAddress,
+      toAccount,
+      toAddress,
+      TFHE.asEuint64(encryptedAmount, inputProof)
+    );
+    return transfer(operation);
   }
 
   function createHold(
-    string calldata operationId,
-    string calldata fromAccount,
-    address fromAddress,
-    string calldata toAccount,
-    address toAddress,
-    string calldata notaryId,
-    euint64 amount,
-    uint256 duration
+    Operation memory operation,
+    string memory notaryId,
+    uint256 expiryTimestamp,
+    bytes32 holdStatus,
+    bytes32 holdType
   ) internal returns (bool) {
-    requireNonExistingHold(_holds[operationId]);
+    requireNonExistingHold(_holds[operation.operationId]);
 
-    ebool canHold = TFHE.le(amount, _balances[fromAccount]);
-    euint64 holdValue = TFHE.select(canHold, amount, TFHE.asEuint64(0));
+    ebool canHold = TFHE.le(operation.amount, _balances[operation.fromAccount]);
+    euint64 holdValue = TFHE.select(canHold, operation.amount, TFHE.asEuint64(0));
 
-    Hold memory newHold = Hold(fromAccount, fromAddress,toAccount, toAddress, notaryId, holdValue, uint256(0), _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL);
+    Hold memory newHold = Hold(operation.fromAccount, operation.fromAddress, operation.toAccount, operation.toAddress, notaryId, holdValue, expiryTimestamp, holdStatus, holdType);
     requireValidHold(newHold);
     TFHE.allowThis(holdValue);
-    TFHE.allow(holdValue, fromAddress);
-    TFHE.allow(holdValue, toAddress);
+    TFHE.allow(holdValue, operation.toAddress);
 
-    euint64 newFromBalance = TFHE.sub(_balances[fromAccount], holdValue);
-    _balances[fromAccount] = newFromBalance;
+    euint64 newFromBalance = TFHE.sub(_balances[operation.fromAccount], holdValue);
+    _balances[operation.fromAccount] = newFromBalance;
     TFHE.allowThis(newFromBalance);
-    TFHE.allow(newFromBalance, fromAddress);
+    TFHE.allow(newFromBalance, operation.fromAddress);
 
-    _holds[operationId] = newHold;
+    _holds[operation.operationId] = newHold;
 
-    emit CreateHoldExecuted(operationId, fromAccount, fromAddress, toAccount, toAddress, notaryId, holdValue);
+    emit CreateHoldExecuted(operation.operationId, operation.fromAccount, operation.fromAddress, operation.toAccount, operation.toAddress, notaryId, holdValue);
     return true;
   }
 
   function createHold(
-    string calldata operationId,
-    string calldata fromAccount,
+    string memory operationId,
+    string memory fromAccount,
     address fromAddress,
-    string calldata toAccount,
+    string memory toAccount,
     address toAddress,
-    string calldata notaryId,
+    string memory notaryId,
     einput encryptedAmount,
-    bytes calldata inputProof,
-    uint256 duration
+    bytes memory inputProof,
+    uint256 expiryTimestamp
   ) public virtual returns (bool) {
-    return createHold(operationId, fromAccount, fromAddress, toAccount, toAddress, notaryId, TFHE.asEuint64(encryptedAmount, inputProof), duration);
+    Operation memory operation = Operation(
+      operationId,
+      fromAccount,
+      fromAddress,
+      toAccount,
+      toAddress,
+      TFHE.asEuint64(encryptedAmount, inputProof)
+    );
+    return createHold(operation, notaryId, expiryTimestamp, _HOLD_STATUS_PERPETUAL, _HOLD_TYPE_NORMAL);
   }
 
   function executeHold(

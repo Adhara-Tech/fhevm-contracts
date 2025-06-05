@@ -9,7 +9,7 @@ const kmsAdd = KMSVERIFIER_ADDRESS;
 const aclAdd = ACL_ADDRESS;
 
 export const createInstance = async (): Promise<FhevmInstance> => {
-  if (network.name === "hardhat") {
+  if (network.name === "hardhat" || network.name === "besu") {
     const instance = {
       reencrypt: reencryptRequestMocked,
       createEncryptedInput: createEncryptedInputMocked,
