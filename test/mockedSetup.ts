@@ -10,8 +10,6 @@ import {
   PRIVATE_KEY_KMS_SIGNER,
   TFHEEXECUTOR_ADDRESS,
 } from "./constants";
-import gatewayArtifact from "fhevm-core-contracts/artifacts/gateway/GatewayContract.sol/GatewayContract.json";
-import {ethers} from "hardhat";
 
 const OneAddress = "0x0000000000000000000000000000000000000001";
 
@@ -58,29 +56,59 @@ export async function setCodeMocked(hre: HardhatRuntimeEnvironment) {
   await gateway.connect(zero).addRelayer(ZeroAddress);
 }
 
-export async function setCodeMocked2(hre: HardhatRuntimeEnvironment) {
+export async function setCodeMockedForBesu(hre: HardhatRuntimeEnvironment) {
   const aclArtifact = require("fhevm-core-contracts/artifacts/contracts/ACL.sol/ACL.json");
+  //console.log('%s', aclArtifact.deployedBytecode)
   const execArtifact = require("fhevm-core-contracts/artifacts/contracts/TFHEExecutorWithEvents.sol/TFHEExecutorWithEvents.json");
+  //console.log('%s', execArtifact.deployedBytecode)
   const kmsArtifact = require("fhevm-core-contracts/artifacts/contracts/KMSVerifier.sol/KMSVerifier.json");
+  //console.log('%s', kmsArtifact.deployedBytecode)
   const inputArtifact = require("fhevm-core-contracts/artifacts/contracts/InputVerifier.coprocessor.sol/InputVerifier.json");
+  //console.log('%s', inputArtifact.deployedBytecode)
   const fhepaymentArtifact = require("fhevm-core-contracts/artifacts/contracts/FHEPayment.sol/FHEPayment.json");
+  //console.log('%s', fhepaymentArtifact.deployedBytecode)
   const gatewayArtifact = require("fhevm-core-contracts/artifacts/gateway/GatewayContract.sol/GatewayContract.json");
-
+  //console.log("%s", gatewayArtifact.deployedBytecode)
   const zero = await hre.ethers.getSigner("fe3b557e8fb62b89f4916b721be55ceb828dbd73");
   const one = await hre.ethers.getSigner("627306090abaB3A6e1400e9345bC60c78a8BEf57");
   const kmsSigner = new hre.ethers.Wallet(PRIVATE_KEY_KMS_SIGNER);
 
   const kms = await hre.ethers.getContractAt(kmsArtifact.abi, KMSVERIFIER_ADDRESS);
-  const init = await kms.connect(zero).initialize(one.address, { gasLimit: 6_000_000 })
-  //console.log(await init.wait());
-  const addSigner = await kms.connect(one).addSigner(kmsSigner, { gasLimit: 6_000_000 });
-  //console.log(await addSigner.wait());
+
+  const initKms = await kms.connect(zero).initialize(one.address);
+  const initKmsReceipt = await initKms.wait();
+  console.log("KMS initialize:", initKmsReceipt.status);
+
+  const addSigner = await kms.connect(one).addSigner(kmsSigner);
+  const addSignerReceipt = await addSigner.wait();
+  console.log("KMS add signer:", addSignerReceipt.status);
+
+  const signers = await kms.getSigners();
+  console.log("KMS signers:", signers.toString());
+  const threshold = await kms.getThreshold();
+  console.log("KMS threshold:", threshold.toString());
+
   const input = await hre.ethers.getContractAt(inputArtifact.abi, INPUTVERIFIER_ADDRESS);
-  await input.connect(zero).initialize(one.address, { gasLimit: 6_000_000 });
-  //console.log(await input.wait());
+
+  const initInput = await input.connect(zero).initialize(one.address/*, { gasLimit: 6_000_000 }*/);
+  const initInputReceipt = await initInput.wait();
+  console.log("INPUT initialize:", initInputReceipt.status);
+
+  const coprocessorAddress = input.getCoprocessorAddress();
+  console.log("INPUT coprocessor address:", initInputReceipt.status);
+
   const gateway = await hre.ethers.getContractAt(gatewayArtifact.abi, GATEWAYCONTRACT_ADDRESS);
-  await gateway.connect(zero).addRelayer(zero.address, { gasLimit: 6_000_000 });
-  //console.log(await gateway.wait());
+
+  const initGateway = await gateway.connect(zero).initialize(zero.address);
+  const initGatewayReceipt = await initGateway.wait();
+  console.log("GATEWAY initialize:", initGatewayReceipt.status);
+
+  const version = await gateway.getVersion();
+  console.log("GATEWAY version:", version.toString());
+
+  const addRelayer = await gateway.connect(zero).addRelayer(zero.address);
+  const addRelayerReceipt = await addRelayer.wait();
+  console.log("GATEWAY add relayer:", addRelayerReceipt.status);
 }
 
 export async function impersonateAddress(hre: HardhatRuntimeEnvironment, address: string, amount: bigint) {

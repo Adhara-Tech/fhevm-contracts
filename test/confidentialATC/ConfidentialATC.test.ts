@@ -117,7 +117,7 @@ describe("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(transferAmount);
   });
 
-  it.only("should not transfer tokens between two users if transfer amount is higher than balance", async function () {
+  it("should not transfer tokens between two users if transfer amount is higher than balance", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 1000;
@@ -154,7 +154,7 @@ describe("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
   });
 
-  it.only("should create hold and execute correctly if balance is sufficient", async function () {
+  it("should create hold and execute correctly if balance is sufficient", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 2000;
@@ -214,7 +214,7 @@ describe("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(holdAmount);
   });
 
-  it.only("should create hold and execute correctly with zero amount if balance is sufficient", async function () {
+  it("should create hold and execute correctly with zero amount if balance is sufficient", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 1000;

@@ -9,7 +9,7 @@ import { resolve } from "path";
 import "solidity-docgen";
 
 import CustomProvider from "./CustomProvider";
-import { setCodeMocked, setCodeMocked2 } from "./test/mockedSetup";
+import { setCodeMocked, setCodeMockedForBesu } from "./test/mockedSetup";
 
 extendProvider(async (provider) => {
   const newProvider = new CustomProvider(provider);
@@ -77,8 +77,8 @@ task("test", async (_taskArgs, hre, runSuper) => {
   if (hre.network.name === "hardhat") {
     await setCodeMocked(hre);
   }
-  if (hre.network.name === "besu") {
-    await setCodeMocked2(hre);
+  if (hre.network.name === "besu"){
+    await setCodeMockedForBesu(hre);
   }
   await runSuper();
 });
