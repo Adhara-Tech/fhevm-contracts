@@ -78,7 +78,7 @@ task("test", async (_taskArgs, hre, runSuper) => {
     await setCodeMocked(hre);
   }
   if (hre.network.name === "besu"){
-    await setCodeMockedForBesu(hre);
+    //await setCodeMockedForBesu(hre);
   }
   await runSuper();
 });

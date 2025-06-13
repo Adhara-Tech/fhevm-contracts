@@ -94,8 +94,11 @@ export async function setCodeMockedForBesu(hre: HardhatRuntimeEnvironment) {
   const initInputReceipt = await initInput.wait();
   console.log("INPUT initialize:", initInputReceipt.status);
 
-  const coprocessorAddress = input.getCoprocessorAddress();
-  console.log("INPUT coprocessor address:", initInputReceipt.status);
+  const coprocessorAddress = await input.getCoprocessorAddress();
+  console.log("COPROCESSOR address:", coprocessorAddress);
+
+  const kmsVerifierAddress = await input.getKMSVerifierAddress();
+  console.log("KMS verifier address:", kmsVerifierAddress);
 
   const gateway = await hre.ethers.getContractAt(gatewayArtifact.abi, GATEWAYCONTRACT_ADDRESS);
 

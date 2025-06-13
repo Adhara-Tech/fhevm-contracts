@@ -94,7 +94,7 @@ describe("ConfidentialATC", function () {
         this.signers.bob.address,
         encryptedTransferAmount.handles[0],
         encryptedTransferAmount.inputProof
-      );
+      , {gasLimit: 6_000_000});
     let result = await tx.wait();
     expect(result.status).to.equal(1);
 
