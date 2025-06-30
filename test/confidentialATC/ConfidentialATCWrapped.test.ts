@@ -107,7 +107,7 @@ describe("ConfidentialATCWrapped using ATC with 6 decimals", function () {
     const encryptedTransferAmount = await input.encrypt();
 
     await expect(this.confidentialATCWrapped.connect(this.signers.alice)[
-      "transfer(string,string,address,string,address,bytes32,bytes,string)"
+      "transfer(string,string,address,string,address,bytes32,bytes)"
       ](
       "operationId",
       fromAccount,
@@ -115,8 +115,7 @@ describe("ConfidentialATCWrapped using ATC with 6 decimals", function () {
       toAccount,
       this.signers.bob.address,
       encryptedTransferAmount.handles[0],
-      encryptedTransferAmount.inputProof,
-      ""
+      encryptedTransferAmount.inputProof
     )).to.be.revertedWithCustomError(this.confidentialATCWrapped, "RestrictedAccount");
   });
 
@@ -220,7 +219,7 @@ describe("ConfidentialATCWrapped using ATC with 6 decimals", function () {
     let encryptedTransferAmount = await input.encrypt();
 
     await this.confidentialATCWrapped.connect(this.signers.alice)[
-      "transfer(string,string,address,string,address,bytes32,bytes,string)"
+      "transfer(string,string,address,string,address,bytes32,bytes)"
       ](
       "operationId",
       fromAccount,
@@ -228,8 +227,7 @@ describe("ConfidentialATCWrapped using ATC with 6 decimals", function () {
       toAccount,
       this.signers.bob.address,
       encryptedTransferAmount.handles[0],
-      encryptedTransferAmount.inputProof,
-      ""
+      encryptedTransferAmount.inputProof
     );
 
     tx = await this.confidentialATCWrapped.unwrap("operationId", toAccount, this.signers.bob.address, amountToUnwrap);
@@ -243,7 +241,7 @@ describe("ConfidentialATCWrapped using ATC with 6 decimals", function () {
     encryptedTransferAmount = await input.encrypt();
 
     await this.confidentialATCWrapped.connect(this.signers.bob)[
-      "transfer(string,string,address,string,address,bytes32,bytes,string)"
+      "transfer(string,string,address,string,address,bytes32,bytes)"
       ](
       "operationId",
       toAccount,
@@ -251,8 +249,7 @@ describe("ConfidentialATCWrapped using ATC with 6 decimals", function () {
       fromAccount,
       this.signers.alice.address,
       encryptedTransferAmount.handles[0],
-      encryptedTransferAmount.inputProof,
-      ""
+      encryptedTransferAmount.inputProof
     );
 
     expect(

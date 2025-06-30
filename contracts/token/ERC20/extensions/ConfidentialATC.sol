@@ -200,6 +200,7 @@ abstract contract ConfidentialATC is IConfidentialATC, TFHEErrors, Ownable2Step 
     Hold memory newHold = Hold(operation.fromAccount, operation.fromAddress, operation.toAccount, operation.toAddress, notaryId, holdValue, expiryTimestamp, holdStatus, holdType);
     requireValidHold(newHold);
     TFHE.allowThis(holdValue);
+    TFHE.allow(holdValue, operation.fromAddress);
     TFHE.allow(holdValue, operation.toAddress);
 
     euint64 newFromBalance = TFHE.sub(_balances[operation.fromAccount], holdValue);

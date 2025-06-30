@@ -72,13 +72,21 @@ task("coverage").setAction(async (taskArgs, hre, runSuper) => {
   await runSuper(taskArgs);
 });
 
-task("test", async (_taskArgs, hre, runSuper) => {
+task("test", "Setup test environment")
+  .addFlag("mocked", "Already mocked")
+  .setAction(async (_taskArgs, hre, runSuper) => {
   // Run modified test task
   if (hre.network.name === "hardhat") {
+    console.log("Setting up for hardhat testing")
     await setCodeMocked(hre);
   }
-  if (hre.network.name === "besu"){
-    //await setCodeMockedForBesu(hre);
+  if (hre.network.name === "besu") {
+    if (!_taskArgs.mocked) {
+      console.log("Setting up for besu testing")
+      await setCodeMockedForBesu(hre);
+    } else { // npx hardhat test --mocked
+      console.log("Skipping setup besu network")
+    }
   }
   await runSuper();
 });

@@ -48,24 +48,24 @@ describe("ConfidentialATC", function () {
     expect(await this.confidentialATC.decimals()).to.be.eq(BigInt(6));
   });
 
-  it.only("should create tokens in the contract", async function () {
+  it("should create tokens in the contract", async function () {
     const fromAccount = "alice";
     const createAmount = 1000;
 
-    const registerTx = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount , this.signers.alice.address);
+    const registerTx = await this.confidentialATC.connect(this.signers.alice).registerAccount(fromAccount, this.signers.alice.address);
     await registerTx.wait();
-    await expect(registerTx).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount , this.signers.alice.address);
+    await expect(registerTx).to.emit(this.confidentialATC, "RegisterAccountExecuted").withArgs(fromAccount, this.signers.alice.address);
 
-    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount , this.signers.alice.address, createAmount, "");
+    const createTx = await this.confidentialATC.connect(this.signers.alice).create("operationId", fromAccount, this.signers.alice.address, createAmount, "");
     await createTx.wait();
-    await expect(createTx).to.emit(this.confidentialATC, "CreateExecuted").withArgs("operationId", fromAccount , this.signers.alice.address, createAmount, "");
+    await expect(createTx).to.emit(this.confidentialATC, "CreateExecuted").withArgs("operationId", fromAccount, this.signers.alice.address, createAmount, "");
 
     expect(
-      await reEncryptBalance(this.signers.alice, fromAccount , this.instance, this.confidentialATC, this.confidentialATCAddress),
+      await reEncryptBalance(this.signers.alice, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress),
     ).to.equal(createAmount);
   });
 
-  it.only("should transfer tokens between two users", async function () {
+  it("should transfer tokens between two users", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 2000;
@@ -112,7 +112,6 @@ describe("ConfidentialATC", function () {
     expect(await reEncryptUint64(this.signers.alice, this.instance, this.confidentialATCAddress, event.amount)).to.equal(transferAmount)
     expect(await reEncryptUint64(this.signers.bob, this.instance, this.confidentialATCAddress, event.amount)).to.equal(transferAmount)
     await expect(reEncryptUint64(this.signers.carol, this.instance, this.confidentialATCAddress, event.amount)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
-    expect(event.metaData).to.equal("");
     expect(await reEncryptBalance(this.signers.alice, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(createAmount - transferAmount);
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(transferAmount);
   });
@@ -271,7 +270,7 @@ describe("ConfidentialATC", function () {
     expect(await reEncryptBalance(this.signers.bob, toAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.equal(0);
   });
 
-  it.only("should not be able to read the balance if not user after initialization", async function () {
+  it("should not be able to read the balance if not user after initialization", async function () {
     const fromAccount = "alice";
     const createAmount = 1000;
 
@@ -286,7 +285,7 @@ describe("ConfidentialATC", function () {
     await expect(reEncryptBalance(this.signers.bob, fromAccount, this.instance, this.confidentialATC, this.confidentialATCAddress)).to.be.rejectedWith("User is not authorized to reencrypt this handle!");
   });
 
-  it.only("sender or receiver cannot be null address", async function () {
+  it("sender or receiver cannot be null address", async function () {
     const NULL_ADDRESS = "0x0000000000000000000000000000000000000000";
     const fromAccount = "alice";
     const toAccount = "bob";
@@ -334,7 +333,7 @@ describe("ConfidentialATC", function () {
     )).to.be.revertedWith("Invalid receiving account address in hold data");
   });
 
-  it.only("sender cannot create hold using a handle from another account", async function () {
+  it("sender cannot create hold using a handle from another account", async function () {
     const fromAccount = "alice";
     const toAccount = "bob";
     const createAmount = 100000;
@@ -368,7 +367,7 @@ describe("ConfidentialATC", function () {
 
   });
 
-  it.only("only owner can create", async function () {
+  it("only owner can create", async function () {
     const fromAccount = "alice";
     const createAmount = 1000;
 
